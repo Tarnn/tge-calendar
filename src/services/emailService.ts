@@ -1,4 +1,5 @@
 import emailjs from '@emailjs/browser'
+import { toast } from 'sonner'
 
 // EmailJS configuration - set these up in EmailJS dashboard or environment variables
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_tge_calendar'
@@ -31,8 +32,16 @@ export interface FAQContactData {
 export class EmailService {
   static async sendBugReport(data: BugReportData): Promise<{ success: boolean; message: string }> {
     // Check if EmailJS is properly configured
-    if (EMAILJS_PUBLIC_KEY === 'your_emailjs_public_key') {
+    if (EMAILJS_PUBLIC_KEY === 'your_emailjs_public_key' || !EMAILJS_PUBLIC_KEY) {
       console.warn('EmailJS not configured, using fallback method')
+      toast.error('EmailJS not configured. Please check your EmailJS public key in .env.local', {
+        duration: 5000,
+        style: {
+          background: '#ef4444',
+          color: 'white',
+          border: '1px solid #dc2626'
+        }
+      })
       return this.sendEmailFallback({
         type: 'bug',
         name: data.name,
@@ -80,6 +89,25 @@ export class EmailService {
   }
 
   static async sendFAQContact(data: FAQContactData): Promise<{ success: boolean; message: string }> {
+    // Check if EmailJS is properly configured
+    if (EMAILJS_PUBLIC_KEY === 'your_emailjs_public_key' || !EMAILJS_PUBLIC_KEY) {
+      console.warn('EmailJS not configured, using fallback method')
+      toast.error('EmailJS not configured. Please check your EmailJS public key in .env.local', {
+        duration: 5000,
+        style: {
+          background: '#ef4444',
+          color: 'white',
+          border: '1px solid #dc2626'
+        }
+      })
+      return this.sendEmailFallback({
+        type: 'faq',
+        name: data.name,
+        email: data.email,
+        message: data.message
+      })
+    }
+
     try {
       const templateParams = {
         to_email: 'tarnwallet@gmail.com',

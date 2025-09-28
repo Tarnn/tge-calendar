@@ -77,14 +77,37 @@ export class CoinMarketCalClient {
     
     try {
       // Fetch from all sources in parallel for maximum coverage
-      const [coinMarketCalEvents, additionalSourceEvents] = await Promise.all([
+      const [coinMarketCalEvents, additionalSourceEvents] = await Promise.allSettled([
         this.fetchCoinMarketCalEvents(params),
         this.multiSource.fetchAllEvents(params)
       ])
       
+      // Extract successful results
+      const successfulEvents: TgeEvent[] = []
+      
+      if (coinMarketCalEvents.status === 'fulfilled') {
+        successfulEvents.push(...coinMarketCalEvents.value)
+        console.log(`CoinMarketCal events: ${coinMarketCalEvents.value.length}`)
+      } else {
+        console.warn('CoinMarketCal failed:', coinMarketCalEvents.reason)
+      }
+      
+      if (additionalSourceEvents.status === 'fulfilled') {
+        successfulEvents.push(...additionalSourceEvents.value)
+        console.log(`Additional source events: ${additionalSourceEvents.value.length}`)
+      } else {
+        console.warn('Additional sources failed:', additionalSourceEvents.reason)
+      }
+      
+      // If no events from APIs, rely on community events
+      if (successfulEvents.length === 0) {
+        console.log('No API events available, using community events only')
+        const communityEvents = await this.multiSource.fetchCommunityEvents()
+        successfulEvents.push(...communityEvents)
+      }
+      
       // Combine and deduplicate all events
-      const allEvents = [...coinMarketCalEvents, ...additionalSourceEvents]
-      const uniqueEvents = this.deduplicateEvents(allEvents)
+      const uniqueEvents = this.deduplicateEvents(successfulEvents)
       
       console.log(`Total unique events from all sources: ${uniqueEvents.length}`)
       
@@ -133,6 +156,9 @@ export class CoinMarketCalClient {
           ...("search" in params && params.search ? { search: params.search } : {}),
         },
       })
+
+      console.log('CoinMarketCal API response status:', response.status)
+      console.log('CoinMarketCal API response data:', response.data)
 
       let rawEvents = (response.data.body ?? []).map(mapEvent).filter(Boolean)
       
@@ -194,7 +220,33 @@ export class CoinMarketCalClient {
       return tgeEvents
     } catch (error) {
       console.error("CoinMarketCal API error:", error)
-      return []
+      
+      // Check if it's an authentication error
+      if (error.response?.status === 403) {
+        console.error("CoinMarketCal API: Authentication failed. Check API key.")
+        return []
+      }
+      
+      // Check if it's a rate limit error
+      if (error.response?.status === 429) {
+        console.error("CoinMarketCal API: Rate limit exceeded.")
+        return []
+      }
+      
+      // Return fallback events for other errors
+      return [
+        {
+          id: 'coinmarketcal-fallback-1',
+          name: 'CoinMarketCal API Unavailable',
+          description: 'CoinMarketCal API is currently unavailable. Using fallback data.',
+          startDate: new Date().toISOString(),
+          blockchain: 'Multiple',
+          symbol: 'N/A',
+          credibility: 'rumor',
+          markets: [],
+          announcementUrl: 'https://coinmarketcal.com'
+        }
+      ]
     }
   }
 

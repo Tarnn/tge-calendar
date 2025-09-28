@@ -7,7 +7,6 @@ import type { EventInput, EventClickArg, DatesSetArg } from '@fullcalendar/core'
 import { format } from 'date-fns'
 import { useTgeEvents } from './hooks/useTgeEvents'
 import type { TgeEvent } from './types/events'
-import { CacheDebugger } from './components/CacheDebugger'
 import { Toaster, toast } from 'sonner'
 
 // Crypto token icons (SVG components)
@@ -802,7 +801,7 @@ const NextTGEBanner = ({ theme }: { theme: string }) => {
         position: 'fixed',
         top: 0,
         left: 0,
-        width: 'calc(100vw - 8px)', // Subtract scrollbar width
+        width: 'calc(100vw - var(--scrollbar-width, 17px))', // Dynamic scrollbar width
         background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 50%, #7c2d12 100%)',
         color: 'white',
         padding: '12px 24px',
@@ -875,11 +874,25 @@ function App(): JSX.Element {
   const [currentPage, setCurrentPage] = React.useState<'home' | 'faq'>('home')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [currentDate, setCurrentDate] = React.useState(new Date(2025, 8, 1)) // September 2025
-  const [isCacheDebugOpen, setIsCacheDebugOpen] = React.useState(false)
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = React.useState(false)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
+  const calendarRef = React.useRef<FullCalendar>(null)
 
   // Fetch TGE events for current month
   const { events: tgeEvents, isLoading, error, refetch } = useTgeEvents(currentDate)
+
+  // Calculate scrollbar width dynamically
+  React.useEffect(() => {
+    const calculateScrollbarWidth = () => {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+      document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`)
+    }
+    
+    calculateScrollbarWidth()
+    window.addEventListener('resize', calculateScrollbarWidth)
+    
+    return () => window.removeEventListener('resize', calculateScrollbarWidth)
+  }, [])
 
   // Handle theme change
   const handleThemeChange = (newTheme: string): void => {
@@ -918,6 +931,28 @@ function App(): JSX.Element {
     setCurrentDate(dateInfo.start)
   }
 
+  // Handle month selection
+  const handleMonthSelect = (monthIndex: number, year: number): void => {
+    const newDate = new Date(year, monthIndex, 1)
+    setCurrentDate(newDate)
+    setIsMonthDropdownOpen(false)
+    
+    // Navigate calendar to selected month
+    if (calendarRef.current) {
+      calendarRef.current.getApi().gotoDate(newDate)
+    }
+  }
+
+  // Generate months for dropdown
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+
+  // Generate years (current year ± 2)
+  const currentYear = new Date().getFullYear()
+  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2]
+
   // Convert TGE events to calendar events
   const calendarEvents = React.useMemo(() => 
     convertToCalendarEvents(tgeEvents), 
@@ -955,6 +990,7 @@ function App(): JSX.Element {
       if (!target.closest('[data-dropdown]') && !target.closest('[data-mobile-menu]')) {
         setIsLanguageDropdownOpen(false)
         setIsThemeDropdownOpen(false)
+        setIsMonthDropdownOpen(false)
         setIsMobileMenuOpen(false)
       }
     }
@@ -986,7 +1022,8 @@ function App(): JSX.Element {
   return (
     <div style={{
       minHeight: '100vh',
-      width: '100vw',
+      width: '100%',
+      maxWidth: '100vw',
       background: theme === 'dark' 
         ? 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)'
         : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1006,7 +1043,7 @@ function App(): JSX.Element {
         position: 'fixed',
         top: '48px', // Adjusted for banner height
         left: 0,
-        width: 'calc(100vw - 8px)', // Subtract scrollbar width
+        width: 'calc(100vw - var(--scrollbar-width, 17px))', // Dynamic scrollbar width
         zIndex: 50,
         background: 'transparent',
         backdropFilter: 'blur(24px)',
@@ -1576,6 +1613,7 @@ function App(): JSX.Element {
                 className="calendar-container"
               >
                 <FullCalendar
+                  ref={calendarRef}
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView='dayGridMonth'
                   initialDate='2025-09-01'
@@ -1584,9 +1622,9 @@ function App(): JSX.Element {
                   datesSet={handleDatesSet}
                   height={700}
                   headerToolbar={{
-                    left: 'prev,next today',
+                    left: 'prev,next',
                     center: 'title',
-                    right: 'dayGridMonth'
+                    right: ''
                   }}
                   eventDisplay='block'
                   dayMaxEvents={3}
@@ -1624,6 +1662,135 @@ function App(): JSX.Element {
             </div>
           </div>
         </motion.div>
+
+        {/* Month Dropdown */}
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+          <div style={{ position: 'relative' }} data-dropdown="month">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsMonthDropdownOpen(!isMonthDropdownOpen)
+              }}
+              style={{
+                background: 'rgba(248, 250, 252, 0.9)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+                minWidth: '200px',
+                justifyContent: 'center'
+              }}
+            >
+              <span>{format(currentDate, 'MMMM yyyy')}</span>
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+                style={{
+                  transform: isMonthDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s'
+                }}
+              >
+                <polyline points="6,9 12,15 18,9"/>
+              </svg>
+            </motion.button>
+
+            <AnimatePresence>
+              {isMonthDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'white',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+                    overflow: 'hidden',
+                    minWidth: '300px',
+                    zIndex: 1000,
+                    marginTop: '8px'
+                  }}
+                >
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(3, 1fr)', 
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}>
+                      {months.map((month, index) => (
+                        <motion.button
+                          key={month}
+                          whileHover={{ backgroundColor: '#f8fafc' }}
+                          onClick={() => handleMonthSelect(index, currentDate.getFullYear())}
+                          style={{
+                            padding: '8px 12px',
+                            background: currentDate.getMonth() === index ? '#ec4899' : 'white',
+                            color: currentDate.getMonth() === index ? 'white' : '#64748b',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {month}
+                        </motion.button>
+                      ))}
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '8px', 
+                      justifyContent: 'center',
+                      borderTop: '1px solid #f1f5f9',
+                      paddingTop: '16px'
+                    }}>
+                      {years.map(year => (
+                        <motion.button
+                          key={year}
+                          whileHover={{ backgroundColor: '#f8fafc' }}
+                          onClick={() => handleMonthSelect(currentDate.getMonth(), year)}
+                          style={{
+                            padding: '8px 16px',
+                            background: currentDate.getFullYear() === year ? '#ec4899' : 'white',
+                            color: currentDate.getFullYear() === year ? 'white' : '#64748b',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {year}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
 
 
         {/* Animated Stats like donate.gg */}
@@ -2446,11 +2613,6 @@ function App(): JSX.Element {
         )}
       </AnimatePresence>
 
-      {/* Cache Debugger */}
-      <CacheDebugger 
-        isVisible={isCacheDebugOpen} 
-        onToggle={() => setIsCacheDebugOpen(!isCacheDebugOpen)} 
-      />
 
       {/* Toast Notifications */}
       <Toaster 

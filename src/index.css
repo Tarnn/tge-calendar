@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --scrollbar-width: 17px; /* Default fallback for Windows scrollbar width */
+  }
+  
   * {
     margin: 0;
     padding: 0;
