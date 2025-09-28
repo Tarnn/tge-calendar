@@ -1,9 +1,12 @@
 import axios, { type AxiosInstance } from "axios"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import type { TgeEvent, TgeEventResponse, FetchEventsParams } from "../types/events"
+import { MultiSourceEventClient } from "./multiSourceEvents"
+import { tgeCacheService } from "../services/tgeCache"
 
 export class CoinMarketCalClient {
   private readonly http: AxiosInstance
+  private readonly multiSource: MultiSourceEventClient
 
   constructor() {
     // Use proxy endpoint in development, direct API in production
@@ -20,38 +23,90 @@ export class CoinMarketCalClient {
       },
       timeout: 15000,
     })
+    
+    this.multiSource = new MultiSourceEventClient()
+  }
+
+  /**
+   * Remove duplicate events based on name and date similarity
+   */
+  private deduplicateEvents(events: TgeEvent[]): TgeEvent[] {
+    const uniqueEvents: TgeEvent[] = []
+    const seen = new Set<string>()
+    
+    for (const event of events) {
+      // Create a key based on normalized name and date
+      const normalizedName = event.name.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const eventDate = new Date(event.startDate).toDateString()
+      const key = `${normalizedName}-${eventDate}`
+      
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniqueEvents.push(event)
+      }
+    }
+    
+    return uniqueEvents.sort((a, b) => 
+      new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    )
   }
 
   async fetchEvents(params: FetchEventsParams = {}): Promise<TgeEventResponse> {
-    try {
-      console.log('Fetching TGE events with params:', params)
+    // Determine the month we're fetching for
+    const targetDate = params.from ? new Date(params.from) : new Date()
+    const monthStart = startOfMonth(targetDate)
+    
+    // Check cache first
+    const cachedEvents = tgeCacheService.getCachedEvents(monthStart)
+    if (cachedEvents) {
+      console.log(`Using cached events for ${format(monthStart, 'yyyy-MM')}: ${cachedEvents.length} events`)
       
-      const response = await this.http.get("/v1/events", {
-        params: {
-          page: params.page ?? 1,
-          max: params.pageSize ?? 50,
-          dateRangeStart: params.from,
-          dateRangeEnd: params.to,
-          sortBy: "created_desc",
-          showMetaData: true,
-          ...("search" in params && params.search ? { search: params.search } : {}),
-        },
-      })
-
-      console.log('API Response:', response.data)
-
-      const events = (response.data.body?.result ?? []).map(mapEvent).filter(Boolean)
+      // Trigger preload for adjacent months in background
+      this.preloadAdjacentMonths(monthStart).catch(console.warn)
       
       return {
-        events,
-        total: response.data.body?.total ?? events.length,
-        page: params.page ?? 1,
-        pageSize: params.pageSize ?? events.length,
+        events: cachedEvents,
+        total: cachedEvents.length,
+        page: 1,
+        pageSize: cachedEvents.length,
+      }
+    }
+
+    // Not cached, fetch from all sources
+    console.log(`Fetching fresh TGE events for ${format(monthStart, 'yyyy-MM')}...`)
+    
+    try {
+      // Fetch from all sources in parallel for maximum coverage
+      const [coinMarketCalEvents, additionalSourceEvents] = await Promise.all([
+        this.fetchCoinMarketCalEvents(params),
+        this.multiSource.fetchAllEvents(params)
+      ])
+      
+      // Combine and deduplicate all events
+      const allEvents = [...coinMarketCalEvents, ...additionalSourceEvents]
+      const uniqueEvents = this.deduplicateEvents(allEvents)
+      
+      console.log(`Total unique events from all sources: ${uniqueEvents.length}`)
+      
+      // Cache the results for this month
+      tgeCacheService.cacheEvents(monthStart, uniqueEvents)
+      
+      // Trigger preload for adjacent months in background
+      this.preloadAdjacentMonths(monthStart).catch(console.warn)
+      
+      // Clean up expired cache entries
+      tgeCacheService.clearExpiredCache()
+      
+      return {
+        events: uniqueEvents,
+        total: uniqueEvents.length,
+        page: 1,
+        pageSize: uniqueEvents.length,
       }
     } catch (error) {
-      console.error("CoinMarketCal API error:", error)
+      console.error("All TGE sources failed:", error)
       
-      // Return mock data as fallback
+      // Return mock data as final fallback
       return {
         events: getMockTgeEvents(params),
         total: 6,
@@ -60,26 +115,145 @@ export class CoinMarketCalClient {
       }
     }
   }
+
+  /**
+   * Fetch events specifically from CoinMarketCal (extracted for caching)
+   */
+  private async fetchCoinMarketCalEvents(params: FetchEventsParams): Promise<TgeEvent[]> {
+    try {
+      console.log('Fetching from CoinMarketCal with comprehensive pagination...')
+      
+      const response = await this.http.get("/events", {
+        params: {
+          page: 1,
+          max: 100,
+          dateRangeStart: params.from,
+          dateRangeEnd: params.to,
+          sortBy: "created_desc",
+          ...("search" in params && params.search ? { search: params.search } : {}),
+        },
+      })
+
+      let rawEvents = (response.data.body ?? []).map(mapEvent).filter(Boolean)
+      
+      // Enhanced TGE filtering with more keywords
+      const tgeKeywords = [
+        'tge', 'token generation', 'launch', 'listing', 'ido', 'ico', 'ieo', 'ito',
+        'mainnet', 'genesis', 'airdrop', 'tokenomics', 'unlock', 'vesting',
+        'binance', 'coinbase', 'kucoin', 'mexc', 'gate.io', 'okx', 'bybit',
+        'uniswap', 'pancakeswap', 'dex listing', 'token sale', 'public sale',
+        'private sale', 'seed round', 'series a', 'launchpad', 'launchpool'
+      ]
+      
+      let tgeEvents = rawEvents.filter(event => {
+        const searchText = `${event.name} ${event.description} ${event.blockchain}`.toLowerCase()
+        return tgeKeywords.some(keyword => searchText.includes(keyword))
+      })
+      
+      // Comprehensive pagination - fetch ALL pages for the month
+      const totalPages = response.data._metadata?.page_count ?? 1
+      if (totalPages > 1) {
+        console.log(`Found ${totalPages} pages, fetching ALL pages for complete coverage...`)
+        
+        const allPageRequests = []
+        for (let page = 2; page <= Math.min(totalPages, 10); page++) { // Cap at 10 pages for safety
+          allPageRequests.push(
+            this.http.get("/events", {
+              params: {
+                page,
+                max: 100,
+                dateRangeStart: params.from,
+                dateRangeEnd: params.to,
+                sortBy: "created_desc",
+              },
+            })
+          )
+        }
+        
+        try {
+          const allResponses = await Promise.all(allPageRequests)
+          
+          for (const pageResponse of allResponses) {
+            const pageEvents = (pageResponse.data.body ?? [])
+              .map(mapEvent)
+              .filter(Boolean)
+              .filter(event => {
+                const searchText = `${event.name} ${event.description} ${event.blockchain}`.toLowerCase()
+                return tgeKeywords.some(keyword => searchText.includes(keyword))
+              })
+            
+            tgeEvents.push(...pageEvents)
+          }
+          
+          console.log(`Fetched ${tgeEvents.length} TGE events from ${Math.min(totalPages, 10)} pages`)
+        } catch (error) {
+          console.warn('Error fetching additional pages:', error)
+        }
+      }
+      
+      return tgeEvents
+    } catch (error) {
+      console.error("CoinMarketCal API error:", error)
+      return []
+    }
+  }
+
+  /**
+   * Preload adjacent months for smooth navigation
+   */
+  private async preloadAdjacentMonths(currentMonth: Date): Promise<void> {
+    await tgeCacheService.preloadAdjacentMonths(currentMonth, async (date) => {
+      const monthStart = startOfMonth(date)
+      const monthEnd = endOfMonth(date)
+      
+      const params: FetchEventsParams = {
+        from: format(monthStart, 'yyyy-MM-dd'),
+        to: format(monthEnd, 'yyyy-MM-dd'),
+        pageSize: 100
+      }
+      
+      const [coinMarketCalEvents, additionalSourceEvents] = await Promise.all([
+        this.fetchCoinMarketCalEvents(params),
+        this.multiSource.fetchAllEvents(params)
+      ])
+      
+      const allEvents = [...coinMarketCalEvents, ...additionalSourceEvents]
+      return this.deduplicateEvents(allEvents)
+    })
+  }
 }
 
 function mapEvent(raw: unknown): TgeEvent | null {
   try {
     const record = raw as Record<string, unknown>
     
+    // Extract coin information
+    const coins = Array.isArray(record.coins) ? record.coins : []
+    const firstCoin = coins.length > 0 ? coins[0] as Record<string, unknown> : null
+    
+    // Extract category information  
+    const categories = Array.isArray(record.categories) ? record.categories : []
+    const categoryNames = categories.map((cat: any) => cat.name).join(", ")
+    
+    // Get title from either title.en or the - field
+    const title = typeof record.title === 'object' && record.title !== null
+      ? (record.title as Record<string, unknown>).en || record['-']
+      : record.title || record['-'] || "Unknown Event"
+    
     return {
       id: String(record.id ?? crypto.randomUUID()),
-      name: String(record.title ?? record.name ?? "Unknown Event"),
-      description: String(record.description ?? ""),
-      startDate: String(record.date_event ?? record.created_date ?? new Date().toISOString()),
-      endDate: record.date_end ? String(record.date_end) : undefined,
-      blockchain: typeof record.platform === "string" ? record.platform : undefined,
-      symbol: typeof record.symbol === "string" ? record.symbol : undefined,
+      name: String(title),
+      description: categoryNames ? `Category: ${categoryNames}` : "",
+      startDate: String(record.date_event ?? new Date().toISOString()),
+      endDate: undefined, // Most events don't have end dates
+      blockchain: firstCoin ? String(firstCoin.name || "Unknown") : "Unknown",
+      symbol: firstCoin ? String(firstCoin.symbol || "") : "",
       announcementUrl: typeof record.source === "string" ? record.source : undefined,
-      credibility: typeof record.important === "number" && record.important > 0 ? "verified" : "rumor",
+      credibility: record.proof ? "verified" : "rumor",
       markets: [],
     }
   } catch (error) {
-    console.warn("Failed to map event:", error)
+    console.warn("Failed to map event:", error, raw)
     return null
   }
 }

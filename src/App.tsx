@@ -4,8 +4,11 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput, EventClickArg, DatesSetArg } from '@fullcalendar/core'
+import { format } from 'date-fns'
 import { useTgeEvents } from './hooks/useTgeEvents'
 import type { TgeEvent } from './types/events'
+import { CacheDebugger } from './components/CacheDebugger'
+import { Toaster, toast } from 'sonner'
 
 // Crypto token icons (SVG components)
 const BitcoinIcon = ({ size }: { size: number }) => (
@@ -699,13 +702,34 @@ const FAQPage = ({ theme, onBack }: { theme: string, onBack: () => void }) => {
                   if (result.success) {
                     // Record submission for spam prevention
                     SpamPrevention.recordSubmission()
-                    alert(result.message)
+                    toast.success(result.message, {
+                      duration: 4000,
+                      style: {
+                        background: '#10b981',
+                        color: 'white',
+                        border: '1px solid #059669'
+                      }
+                    })
                   } else {
-                    alert(result.message)
+                    toast.error(result.message, {
+                      duration: 5000,
+                      style: {
+                        background: '#ef4444',
+                        color: 'white',
+                        border: '1px solid #dc2626'
+                      }
+                    })
                   }
                 } catch (error) {
                   console.error('Error sending FAQ contact:', error)
-                  alert('Failed to send message. Please try again later.')
+                  toast.error('Failed to send message. Please try again later.', {
+                    duration: 5000,
+                    style: {
+                      background: '#ef4444',
+                      color: 'white',
+                      border: '1px solid #dc2626'
+                    }
+                  })
                 } finally {
                   // Reset button state
                   button.textContent = originalText
@@ -778,7 +802,7 @@ const NextTGEBanner = ({ theme }: { theme: string }) => {
         position: 'fixed',
         top: 0,
         left: 0,
-        right: 0,
+        width: 'calc(100vw - 8px)', // Subtract scrollbar width
         background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 50%, #7c2d12 100%)',
         color: 'white',
         padding: '12px 24px',
@@ -810,23 +834,29 @@ const NextTGEBanner = ({ theme }: { theme: string }) => {
 const convertToCalendarEvents = (tgeEvents: TgeEvent[]): EventInput[] => {
   const colors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
   
-  return tgeEvents.map((event, index) => ({
-    id: event.id,
-    title: event.symbol ? `${event.symbol} - ${event.name}` : event.name,
-    start: event.startDate,
-    end: event.endDate,
-    backgroundColor: colors[index % colors.length],
-    borderColor: colors[index % colors.length],
-    textColor: 'white',
-    extendedProps: {
-      description: event.description,
-      blockchain: event.blockchain,
-      symbol: event.symbol,
-      credibility: event.credibility,
-      announcementUrl: event.announcementUrl,
-      markets: event.markets
+  console.log('Converting TGE events to calendar events:', tgeEvents)
+  
+  return tgeEvents.map((event, index) => {
+    const calendarEvent = {
+      id: event.id,
+      title: event.symbol ? `${event.symbol} - ${event.name}` : event.name,
+      start: event.startDate,
+      end: event.endDate,
+      backgroundColor: colors[index % colors.length],
+      borderColor: colors[index % colors.length],
+      textColor: 'white',
+      extendedProps: {
+        description: event.description,
+        blockchain: event.blockchain,
+        symbol: event.symbol,
+        credibility: event.credibility,
+        announcementUrl: event.announcementUrl,
+        markets: event.markets
+      }
     }
-  }))
+    console.log('Created calendar event:', calendarEvent)
+    return calendarEvent
+  })
 }
 
 function App(): JSX.Element {
@@ -844,7 +874,8 @@ function App(): JSX.Element {
   const [isBugReportOpen, setIsBugReportOpen] = React.useState(false)
   const [currentPage, setCurrentPage] = React.useState<'home' | 'faq'>('home')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
-  const [currentDate, setCurrentDate] = React.useState(new Date())
+  const [currentDate, setCurrentDate] = React.useState(new Date(2025, 8, 1)) // September 2025
+  const [isCacheDebugOpen, setIsCacheDebugOpen] = React.useState(false)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
   // Fetch TGE events for current month
@@ -975,7 +1006,7 @@ function App(): JSX.Element {
         position: 'fixed',
         top: '48px', // Adjusted for banner height
         left: 0,
-        right: 0,
+        width: 'calc(100vw - 8px)', // Subtract scrollbar width
         zIndex: 50,
         background: 'transparent',
         backdropFilter: 'blur(24px)',
@@ -1175,16 +1206,19 @@ function App(): JSX.Element {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     style={{
-                      position: 'fixed',
-                      top: '72px',
-                      right: '80px',
+                      position: 'absolute',
+                      top: '100%',
+                      left: '0',
+                      right: 'auto',
                       background: 'white',
                       borderRadius: '12px',
                       border: '1px solid #e2e8f0',
                       boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
                       overflow: 'hidden',
                       minWidth: '160px',
-                      zIndex: 1000
+                      zIndex: 1000,
+                      marginTop: '8px',
+                      transform: 'translateX(0)'
                     }}
                   >
                     {languages.map(lang => (
@@ -1267,16 +1301,19 @@ function App(): JSX.Element {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                     style={{
-                      position: 'fixed',
-                      top: '72px',
-                      right: '24px',
+                      position: 'absolute',
+                      top: '100%',
+                      left: '0',
+                      right: 'auto',
                       background: 'white',
                       borderRadius: '12px',
                       border: '1px solid #e2e8f0',
                       boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
                       overflow: 'hidden',
                       minWidth: '160px',
-                      zIndex: 1000
+                      zIndex: 1000,
+                      marginTop: '8px',
+                      transform: 'translateX(0)'
                     }}
                   >
                     {themes.map(themeOption => (
@@ -1323,7 +1360,7 @@ function App(): JSX.Element {
               position: 'fixed',
               top: '120px', // Adjusted for banner + header height
               left: '16px',
-              right: '16px',
+              right: '24px', // Account for scrollbar
               background: 'rgba(248, 250, 252, 0.95)',
               backdropFilter: 'blur(20px)',
               borderRadius: '16px',
@@ -1541,6 +1578,7 @@ function App(): JSX.Element {
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView='dayGridMonth'
+                  initialDate='2025-09-01'
                   events={calendarEvents}
                   eventClick={handleEventClick}
                   datesSet={handleDatesSet}
@@ -1739,19 +1777,30 @@ function App(): JSX.Element {
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText('7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7')
-                  // Show success feedback
-                  const button = event?.target as HTMLButtonElement
-                  const originalText = button.textContent
-                  button.textContent = 'Copied!'
-                  button.style.background = '#22c55e'
-                  
-                  setTimeout(() => {
-                    button.textContent = originalText
-                    button.style.background = 'linear-gradient(135deg, #00FFA3, #DC1FFF)'
-                  }, 2000)
+                  toast.success('Copied CA: 7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7!', {
+                    duration: 3000,
+                    style: {
+                      background: '#10b981',
+                      color: 'white',
+                      border: '1px solid #059669',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }
+                  })
                 } catch (err) {
                   console.error('Failed to copy address:', err)
-                  alert('Failed to copy address. Please copy manually: 7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7')
+                  toast.error('Failed to copy address. Please copy manually: 7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7', {
+                    duration: 5000,
+                    style: {
+                      background: '#ef4444',
+                      color: 'white',
+                      border: '1px solid #dc2626',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }
+                  })
                 }
               }}
               style={{
@@ -2169,16 +2218,37 @@ function App(): JSX.Element {
                     SpamPrevention.recordSubmission()
                     
                     setIsBugReportOpen(false)
-                    alert(result.message)
+                    toast.success(result.message, {
+                      duration: 4000,
+                      style: {
+                        background: '#10b981',
+                        color: 'white',
+                        border: '1px solid #059669'
+                      }
+                    })
                     
                     // Reset form
                     ;(e.target as HTMLFormElement).reset()
                   } else {
-                    alert(result.message)
+                    toast.error(result.message, {
+                      duration: 5000,
+                      style: {
+                        background: '#ef4444',
+                        color: 'white',
+                        border: '1px solid #dc2626'
+                      }
+                    })
                   }
                 } catch (error) {
                   console.error('Error submitting bug report:', error)
-                  alert('Failed to send bug report. Please try again later.')
+                  toast.error('Failed to send bug report. Please try again later.', {
+                    duration: 5000,
+                    style: {
+                      background: '#ef4444',
+                      color: 'white',
+                      border: '1px solid #dc2626'
+                    }
+                  })
                 } finally {
                   // Reset button state
                   submitButton.textContent = originalText
@@ -2375,6 +2445,31 @@ function App(): JSX.Element {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Cache Debugger */}
+      <CacheDebugger 
+        isVisible={isCacheDebugOpen} 
+        onToggle={() => setIsCacheDebugOpen(!isCacheDebugOpen)} 
+      />
+
+      {/* Toast Notifications */}
+      <Toaster 
+        position="bottom-right"
+        expand={true}
+        richColors={true}
+        closeButton={true}
+        toastOptions={{
+          style: {
+            background: theme === 'dark' ? '#1f2937' : '#ffffff',
+            color: theme === 'dark' ? '#ffffff' : '#1f2937',
+            border: theme === 'dark' ? '1px solid #374151' : '1px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+          }
+        }}
+      />
       </div>
   )
 }

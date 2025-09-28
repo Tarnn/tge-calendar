@@ -1,137 +1,144 @@
 # EmailJS Setup Guide for TGE Calendar
 
-This guide will help you set up EmailJS to handle email submissions from the TGE Calendar application.
+## 📧 Setting up Email Functionality
 
-## Step 1: Create EmailJS Account
-
-1. Go to [EmailJS](https://www.emailjs.com/)
-2. Sign up for a free account
+### Step 1: Create EmailJS Account
+1. Go to [https://www.emailjs.com/](https://www.emailjs.com/)
+2. Sign up for a free account (200 emails/month free tier)
 3. Verify your email address
 
-## Step 2: Add Email Service
+### Step 2: Add Email Service
+1. In EmailJS dashboard → **"Email Services"**
+2. Click **"Add New Service"**
+3. Choose your email provider:
+   - **Gmail** (recommended for personal)
+   - **Outlook/Hotmail**
+   - **Yahoo Mail**
+   - **Custom SMTP** (for business emails)
+4. Follow connection instructions
+5. **Copy the Service ID** (format: `service_xxxxxxx`)
 
-1. In your EmailJS dashboard, go to "Email Services"
-2. Click "Add New Service"
-3. Choose your email provider (Gmail recommended for `tarnwallet@gmail.com`)
-4. Follow the setup instructions for Gmail:
-   - Service ID: `service_tge_calendar` (or your preferred ID)
-   - Configure with your Gmail credentials
+### Step 3: Create Email Templates
 
-## Step 3: Create Email Templates
-
-### Bug Report Template
-1. Go to "Email Templates" in your dashboard
-2. Create a new template with ID: `template_bug_report`
-3. Use this template content:
-
+#### Bug Report Template
+1. Go to **"Email Templates"** → **"Create New Template"**
+2. **Template Name**: `Bug Report Template`
+3. **Template ID**: `template_bug_report`
+4. **Subject**: `TGE Calendar - Bug Report from {{from_name}}`
+5. **Content**:
 ```
-Subject: TGE Calendar - Bug Report from {{from_name}}
+Hi there,
 
-Hello,
-
-You have received a new bug report from the TGE Calendar application.
+A bug report has been submitted from the TGE Calendar website:
 
 **Reporter Details:**
 - Name: {{from_name}}
 - Email: {{from_email}}
 - Timestamp: {{timestamp}}
-- Page URL: {{page_url}}
-- User Agent: {{user_agent}}
+- Page: {{page_url}}
+- Browser: {{user_agent}}
 
 **Bug Description:**
 {{message}}
 
+**Report Type:** {{report_type}}
+
 ---
-This email was sent automatically from TGE Calendar.
+This is an automated email from TGE Calendar
+Website: https://tgecalendar.com
 ```
 
-### FAQ Contact Template
-1. Create another template with ID: `template_faq_contact`
-2. Use this template content:
-
+#### FAQ Contact Template
+1. Create another template
+2. **Template Name**: `FAQ Contact Template`
+3. **Template ID**: `template_faq_contact`
+4. **Subject**: `TGE Calendar - Contact from {{from_name}}`
+5. **Content**:
 ```
-Subject: TGE Calendar - Question from {{from_name}}
+Hi there,
 
-Hello,
-
-You have received a new message from the TGE Calendar application.
+A message has been submitted from the TGE Calendar FAQ page:
 
 **Contact Details:**
 - Name: {{from_name}}
 - Email: {{from_email}}
 - Timestamp: {{timestamp}}
-- Page URL: {{page_url}}
+- Page: {{page_url}}
 
 **Message:**
 {{message}}
 
+**Type:** {{report_type}}
+
 ---
-This email was sent automatically from TGE Calendar.
+This is an automated email from TGE Calendar
+Website: https://tgecalendar.com
 ```
 
-## Step 4: Get Your Public Key
+### Step 4: Get Public Key
+1. Go to **"Account"** → **"General"**
+2. Find **"Public Key"** section
+3. **Copy the Public Key** (long alphanumeric string)
 
-1. Go to "Account" > "General"
-2. Copy your Public Key
-3. Update the `EMAILJS_PUBLIC_KEY` in `src/services/emailService.ts`
+### Step 5: Update Environment Variables
+Create `.env.local` file in your project root with:
 
-## Step 5: Update Configuration
+```bash
+# Your existing API key
+VITE_COINMARKETCAL_API_KEY=TOgJPIJwJK8Wn7JeLSKMZQNeRMrs5VwazqYDbwve
+VITE_COINMARKETCAL_API_BASE_URL=https://developers.coinmarketcal.com
 
-Update the following values in `src/services/emailService.ts`:
-
-```typescript
-const EMAILJS_SERVICE_ID = 'your_service_id' // From Step 2
-const EMAILJS_TEMPLATE_ID_BUG = 'template_bug_report' // From Step 3
-const EMAILJS_TEMPLATE_ID_FAQ = 'template_faq_contact' // From Step 3
-const EMAILJS_PUBLIC_KEY = 'your_public_key' // From Step 4
-```
-
-## Step 6: Test the Integration
-
-1. Run your application
-2. Try submitting a bug report
-3. Try sending a message from the FAQ page
-4. Check your email (`tarnwallet@gmail.com`) for the messages
-
-## Alternative: Using Formspree (Simpler Setup)
-
-If you prefer a simpler setup, you can use Formspree instead:
-
-1. Go to [Formspree](https://formspree.io/)
-2. Create a free account
-3. Create a new form pointing to `tarnwallet@gmail.com`
-4. Get your form endpoint URL
-5. Update the `sendEmailFallback` method in `emailService.ts` with your Formspree URL
-
-## Environment Variables (Optional)
-
-For better security, you can store the EmailJS configuration in environment variables:
-
-1. Create `.env.local` file:
-```
-VITE_EMAILJS_SERVICE_ID=your_service_id
+# EmailJS Configuration - Replace with your actual values
+VITE_EMAILJS_SERVICE_ID=service_your_actual_service_id
 VITE_EMAILJS_TEMPLATE_BUG=template_bug_report
 VITE_EMAILJS_TEMPLATE_FAQ=template_faq_contact
-VITE_EMAILJS_PUBLIC_KEY=your_public_key
+VITE_EMAILJS_PUBLIC_KEY=your_actual_public_key_here
 ```
 
-2. Update `emailService.ts` to use environment variables:
-```typescript
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID
-const EMAILJS_TEMPLATE_ID_BUG = import.meta.env.VITE_EMAILJS_TEMPLATE_BUG
-const EMAILJS_TEMPLATE_ID_FAQ = import.meta.env.VITE_EMAILJS_TEMPLATE_FAQ
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-```
+### Step 6: Test Email Functionality
+1. Restart your dev server: `npm run dev`
+2. Try submitting a bug report from the app
+3. Try contacting from the FAQ page
+4. Check your email for test messages
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
-- **Emails not sending**: Check browser console for errors
-- **Wrong email format**: Verify template variables match the code
-- **Rate limiting**: EmailJS free tier has monthly limits
-- **Spam folder**: Check if emails are going to spam
+### Common Issues:
+1. **"EmailJS not configured"** → Check your public key
+2. **"Service not found"** → Verify service ID
+3. **"Template not found"** → Check template IDs match exactly
+4. **Emails not sending** → Check EmailJS dashboard for error logs
 
-## Security Notes
+### Rate Limits:
+- **Free tier**: 200 emails/month
+- **Personal tier**: 1,000 emails/month ($9/month)
+- **Team tier**: 10,000 emails/month ($35/month)
 
-- EmailJS public key is safe to expose in frontend code
-- The 5-minute cooldown prevents spam
-- Consider implementing additional validation for production use
+## 📝 Template Variables Available
+
+The following variables are automatically passed to your templates:
+
+### Bug Reports:
+- `{{from_name}}` - User's name
+- `{{from_email}}` - User's email
+- `{{message}}` - Bug description
+- `{{timestamp}}` - When submitted
+- `{{page_url}}` - Current page URL
+- `{{user_agent}}` - Browser info
+- `{{report_type}}` - "Bug Report"
+
+### FAQ Contact:
+- `{{from_name}}` - User's name
+- `{{from_email}}` - User's email
+- `{{message}}` - User's message
+- `{{timestamp}}` - When submitted
+- `{{page_url}}` - Current page URL
+- `{{report_type}}` - "FAQ Contact"
+
+## 🚀 Ready to Go!
+
+Once configured, users can:
+- ✅ Submit bug reports with automatic emails to `tarnwallet@gmail.com`
+- ✅ Contact you via FAQ page
+- ✅ Spam protection with 5-minute cooldown
+- ✅ Fallback to mailto: if EmailJS fails

@@ -23,6 +23,15 @@ export function useTgeEvents(currentDate: Date) {
     retry: 3,
   })
 
+  console.log('useTgeEvents hook data:', { 
+    events: data?.events ?? [], 
+    total: data?.total ?? 0, 
+    isLoading, 
+    error,
+    currentDate: format(currentDate, 'yyyy-MM-dd'),
+    params
+  })
+
   return {
     events: data?.events ?? [],
     total: data?.total ?? 0,
