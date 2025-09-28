@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 // EmailJS configuration - set these up in EmailJS dashboard or environment variables
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_tge_calendar'
 const EMAILJS_TEMPLATE_ID_BUG = import.meta.env.VITE_EMAILJS_TEMPLATE_BUG || 'template_bug_report'
-const EMAILJS_TEMPLATE_ID_FAQ = import.meta.env.VITE_EMAILJS_TEMPLATE_FAQ || 'template_faq_contact'
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'your_emailjs_public_key'
 
 // Initialize EmailJS only if we have a valid key
@@ -21,13 +20,6 @@ export interface BugReportData {
   url: string
 }
 
-export interface FAQContactData {
-  name?: string
-  email?: string
-  message: string
-  timestamp: string
-  url: string
-}
 
 export class EmailService {
   static async sendBugReport(data: BugReportData): Promise<{ success: boolean; message: string }> {
@@ -88,61 +80,10 @@ export class EmailService {
     }
   }
 
-  static async sendFAQContact(data: FAQContactData): Promise<{ success: boolean; message: string }> {
-    // Check if EmailJS is properly configured
-    if (EMAILJS_PUBLIC_KEY === 'your_emailjs_public_key' || !EMAILJS_PUBLIC_KEY) {
-      console.warn('EmailJS not configured, using fallback method')
-      toast.error('EmailJS not configured. Please check your EmailJS public key in .env.local', {
-        duration: 5000,
-        style: {
-          background: '#ef4444',
-          color: 'white',
-          border: '1px solid #dc2626'
-        }
-      })
-      return this.sendEmailFallback({
-        type: 'faq',
-        name: data.name,
-        email: data.email,
-        message: data.message
-      })
-    }
-
-    try {
-      const templateParams = {
-        to_email: 'tarnwallet@gmail.com',
-        from_name: data.name || 'Anonymous',
-        from_email: data.email || 'no-reply@tgecalendar.com',
-        subject: 'TGE Calendar - General Question',
-        message: data.message,
-        timestamp: data.timestamp,
-        page_url: data.url,
-        report_type: 'FAQ Contact'
-      }
-
-      const response = await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID_FAQ,
-        templateParams
-      )
-
-      if (response.status === 200) {
-        return { success: true, message: 'Your message has been sent successfully!' }
-      } else {
-        throw new Error(`EmailJS returned status: ${response.status}`)
-      }
-    } catch (error) {
-      console.error('Error sending FAQ contact:', error)
-      return { 
-        success: false, 
-        message: 'Failed to send message. Please try again later.' 
-      }
-    }
-  }
 
   // Fallback method using a simple HTTP service (like Formspree or similar)
   static async sendEmailFallback(data: {
-    type: 'bug' | 'faq'
+    type: 'bug'
     name: string
     email: string
     message: string
@@ -152,7 +93,7 @@ export class EmailService {
       // You can replace this with Formspree, Netlify Forms, or similar
       const formData = new FormData()
       formData.append('_to', 'tarnwallet@gmail.com')
-      formData.append('_subject', `TGE Calendar - ${data.type === 'bug' ? 'Bug Report' : 'General Question'}`)
+      formData.append('_subject', 'TGE Calendar - Bug Report')
       formData.append('name', data.name)
       formData.append('email', data.email)
       formData.append('message', data.message)

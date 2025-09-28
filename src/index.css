@@ -19,6 +19,13 @@
     width: 100%;
     height: 100%;
     overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  
+  body {
+    overflow-x: hidden;
+    width: 100vw;
+    max-width: 100vw;
   }
   
   #root {
@@ -116,6 +123,11 @@
   75% {
     transform: translateY(-30px) rotate(270deg);
   }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* FullCalendar React styling */

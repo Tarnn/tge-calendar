@@ -19,9 +19,10 @@ export class CoinMarketCalClient {
       headers: {
         "x-api-key": import.meta.env.VITE_COINMARKETCAL_API_KEY || "TOgJPIJwJK8Wn7JeLSKMZQNeRMrs5VwazqYDbwve",
         "Accept": "application/json",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      timeout: 15000,
+      timeout: 20000, // Increased timeout
+      validateStatus: (status) => status < 500, // Don't throw on 4xx errors
     })
     
     this.multiSource = new MultiSourceEventClient()
@@ -143,10 +144,14 @@ export class CoinMarketCalClient {
    * Fetch events specifically from CoinMarketCal (extracted for caching)
    */
   private async fetchCoinMarketCalEvents(params: FetchEventsParams): Promise<TgeEvent[]> {
-    try {
-      console.log('Fetching from CoinMarketCal with comprehensive pagination...')
-      
-      const response = await this.http.get("/events", {
+    const maxRetries = 3
+    let lastError: any = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Fetching from CoinMarketCal (attempt ${attempt}/${maxRetries})...`)
+        
+        const response = await this.http.get("/events", {
         params: {
           page: 1,
           max: 100,
@@ -217,61 +222,63 @@ export class CoinMarketCalClient {
         }
       }
       
-      return tgeEvents
-    } catch (error) {
-      console.error("CoinMarketCal API error:", error)
-      
-      // Check if it's an authentication error
-      if (error.response?.status === 403) {
-        console.error("CoinMarketCal API: Authentication failed. Check API key.")
-        return []
-      }
-      
-      // Check if it's a rate limit error
-      if (error.response?.status === 429) {
-        console.error("CoinMarketCal API: Rate limit exceeded.")
-        return []
-      }
-      
-      // Return fallback events for other errors
-      return [
-        {
-          id: 'coinmarketcal-fallback-1',
-          name: 'CoinMarketCal API Unavailable',
-          description: 'CoinMarketCal API is currently unavailable. Using fallback data.',
-          startDate: new Date().toISOString(),
-          blockchain: 'Multiple',
-          symbol: 'N/A',
-          credibility: 'rumor',
-          markets: [],
-          announcementUrl: 'https://coinmarketcal.com'
+        return tgeEvents
+      } catch (error) {
+        lastError = error
+        console.warn(`CoinMarketCal API attempt ${attempt} failed:`, error)
+        
+        // Don't retry on authentication errors
+        if (error.response?.status === 403) {
+          console.error("CoinMarketCal API: Authentication failed. Check API key.")
+          return []
         }
-      ]
+        
+        // Don't retry on rate limit errors
+        if (error.response?.status === 429) {
+          console.error("CoinMarketCal API: Rate limit exceeded.")
+          return []
+        }
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
+          console.log(`Retrying in ${delay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
     }
+    
+    // All retries failed
+    console.error("CoinMarketCal API: All attempts failed:", lastError)
+    return []
   }
 
   /**
    * Preload adjacent months for smooth navigation
    */
   private async preloadAdjacentMonths(currentMonth: Date): Promise<void> {
-    await tgeCacheService.preloadAdjacentMonths(currentMonth, async (date) => {
-      const monthStart = startOfMonth(date)
-      const monthEnd = endOfMonth(date)
-      
-      const params: FetchEventsParams = {
-        from: format(monthStart, 'yyyy-MM-dd'),
-        to: format(monthEnd, 'yyyy-MM-dd'),
-        pageSize: 100
-      }
-      
-      const [coinMarketCalEvents, additionalSourceEvents] = await Promise.all([
-        this.fetchCoinMarketCalEvents(params),
-        this.multiSource.fetchAllEvents(params)
-      ])
-      
-      const allEvents = [...coinMarketCalEvents, ...additionalSourceEvents]
-      return this.deduplicateEvents(allEvents)
-    })
+    try {
+      await tgeCacheService.preloadAdjacentMonths(currentMonth, async (date) => {
+        const monthStart = startOfMonth(date)
+        const monthEnd = endOfMonth(date)
+        
+        const params: FetchEventsParams = {
+          from: format(monthStart, 'yyyy-MM-dd'),
+          to: format(monthEnd, 'yyyy-MM-dd'),
+          pageSize: 100
+        }
+        
+        const [coinMarketCalEvents, additionalSourceEvents] = await Promise.all([
+          this.fetchCoinMarketCalEvents(params),
+          this.multiSource.fetchAllEvents(params)
+        ])
+        
+        const allEvents = [...coinMarketCalEvents, ...additionalSourceEvents]
+        return this.deduplicateEvents(allEvents)
+      })
+    } catch (error) {
+      console.warn('Failed to preload adjacent months:', error)
+    }
   }
 }
 

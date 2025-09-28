@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { startOfMonth, endOfMonth, format } from "date-fns"
 import { CoinMarketCalClient } from "../api/coinmarketcal"
+import { tgeEventsStore } from "../services/tgeEventsStore"
 import type { TgeEvent, FetchEventsParams } from "../types/events"
 
 const client = new CoinMarketCalClient()
@@ -17,7 +18,32 @@ export function useTgeEvents(currentDate: Date) {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tge-events', format(currentDate, 'yyyy-MM')],
-    queryFn: () => client.fetchEvents(params),
+    queryFn: async () => {
+      // First check if we have cached events for this month
+      const cachedEvents = tgeEventsStore.getEventsForMonth(currentDate)
+      if (cachedEvents.length > 0) {
+        console.log(`Using cached events for ${format(currentDate, 'yyyy-MM')}: ${cachedEvents.length} events`)
+        return {
+          events: cachedEvents,
+          total: cachedEvents.length,
+          page: 1,
+          pageSize: cachedEvents.length,
+        }
+      }
+
+      // If no cached events, fetch from API
+      console.log(`Fetching fresh events for ${format(currentDate, 'yyyy-MM')}...`)
+      const apiResult = await client.fetchEvents(params)
+      
+      // Add to store for future use
+      if (apiResult.events.length > 0) {
+        tgeEventsStore.addEvents(apiResult.events)
+        tgeEventsStore.persist()
+        console.log(`Added ${apiResult.events.length} events to store`)
+      }
+      
+      return apiResult
+    },
     refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
     staleTime: 1000 * 60 * 2, // Consider data stale after 2 minutes
     retry: 3,
@@ -29,7 +55,9 @@ export function useTgeEvents(currentDate: Date) {
     isLoading, 
     error,
     currentDate: format(currentDate, 'yyyy-MM-dd'),
-    params
+    params,
+    monthStart: format(monthStart, 'yyyy-MM-dd'),
+    monthEnd: format(monthEnd, 'yyyy-MM-dd')
   })
 
   return {

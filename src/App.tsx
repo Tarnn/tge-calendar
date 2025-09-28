@@ -6,6 +6,9 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput, EventClickArg, DatesSetArg } from '@fullcalendar/core'
 import { format } from 'date-fns'
 import { useTgeEvents } from './hooks/useTgeEvents'
+import { useTgeEventsManager } from './hooks/useTgeEventsManager'
+import { SearchModal } from './components/SearchModal'
+import { searchService } from './services/searchService'
 import type { TgeEvent } from './types/events'
 import { Toaster, toast } from 'sonner'
 
@@ -260,9 +263,9 @@ const TypewriterText = () => {
     const beforeTGE = text.slice(0, tgeIndex)
     const tgeText = text.slice(tgeIndex, tgeIndex + 4)
     const afterTGE = text.slice(tgeIndex + 4)
-    
-    return (
-      <>
+
+  return (
+    <>
         <span>{beforeTGE}</span>
         <span style={{ 
           color: '#f7931a',
@@ -802,6 +805,7 @@ const NextTGEBanner = ({ theme }: { theme: string }) => {
         top: 0,
         left: 0,
         width: 'calc(100vw - var(--scrollbar-width, 17px))', // Dynamic scrollbar width
+        right: 'var(--scrollbar-width, 17px)', // Ensure it doesn't extend beyond scrollbar
         background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 50%, #7c2d12 100%)',
         color: 'white',
         padding: '12px 24px',
@@ -829,39 +833,12 @@ const NextTGEBanner = ({ theme }: { theme: string }) => {
   )
 }
 
-// Convert TGE events to FullCalendar format
-const convertToCalendarEvents = (tgeEvents: TgeEvent[]): EventInput[] => {
-  const colors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
-  
-  console.log('Converting TGE events to calendar events:', tgeEvents)
-  
-  return tgeEvents.map((event, index) => {
-    const calendarEvent = {
-      id: event.id,
-      title: event.symbol ? `${event.symbol} - ${event.name}` : event.name,
-      start: event.startDate,
-      end: event.endDate,
-      backgroundColor: colors[index % colors.length],
-      borderColor: colors[index % colors.length],
-      textColor: 'white',
-      extendedProps: {
-        description: event.description,
-        blockchain: event.blockchain,
-        symbol: event.symbol,
-        credibility: event.credibility,
-        announcementUrl: event.announcementUrl,
-        markets: event.markets
-      }
-    }
-    console.log('Created calendar event:', calendarEvent)
-    return calendarEvent
-  })
-}
-
 function App(): JSX.Element {
   const [selectedEvent, setSelectedEvent] = React.useState<TgeEvent | null>(null)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [filteredEvents, setFilteredEvents] = React.useState<TgeEvent[]>([])
+  const [isSearching, setIsSearching] = React.useState(false)
   const [theme, setTheme] = React.useState(() => {
     const saved = localStorage.getItem('theme')
     if (saved) return saved
@@ -875,24 +852,168 @@ function App(): JSX.Element {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [currentDate, setCurrentDate] = React.useState(new Date(2025, 8, 1)) // September 2025
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = React.useState(false)
+  const [isSearchModalOpen, setIsSearchModalOpen] = React.useState(false)
+  const [isUserNavigating, setIsUserNavigating] = React.useState(false)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const calendarRef = React.useRef<FullCalendar>(null)
 
   // Fetch TGE events for current month
   const { events: tgeEvents, isLoading, error, refetch } = useTgeEvents(currentDate)
+  
+  // TGE Events Manager for search functionality
+  const { addEvents } = useTgeEventsManager()
+
+  // Clear cache on app load to ensure updated dates are loaded
+  React.useEffect(() => {
+    // Clear cache to force reload of updated TGE dates
+    localStorage.removeItem('tge_events_store')
+    console.log('Cache cleared to load updated TGE dates')
+  }, [])
+
+  // Convert TGE events to FullCalendar format
+  const convertToCalendarEvents = (tgeEvents: TgeEvent[]): EventInput[] => {
+    const colors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+    
+    console.log('Converting TGE events to calendar events:', tgeEvents)
+    
+    return tgeEvents.map((event, index) => {
+      // Parse the start date and ensure it's a proper date
+      const startDate = new Date(event.startDate)
+      const endDate = event.endDate ? new Date(event.endDate) : null
+      
+      // Create a date string without time for all-day events
+      const startDateString = startDate.toISOString().split('T')[0]
+      const endDateString = endDate ? endDate.toISOString().split('T')[0] : null
+      
+      const calendarEvent = {
+        id: event.id,
+        title: event.symbol ? `${event.symbol} - ${event.name}` : event.name,
+        start: startDateString,
+        end: endDateString,
+        allDay: true, // Make all events all-day to remove time display
+        backgroundColor: colors[index % colors.length],
+        borderColor: colors[index % colors.length],
+        textColor: 'white',
+        extendedProps: {
+          description: event.description,
+          blockchain: event.blockchain,
+          symbol: event.symbol,
+          credibility: event.credibility,
+          announcementUrl: event.announcementUrl,
+          markets: event.markets,
+          originalStartDate: event.startDate, // Keep original for modal display
+          originalEndDate: event.endDate
+        }
+      }
+      console.log('Created calendar event:', calendarEvent)
+      return calendarEvent
+    })
+  }
+
+  // Determine which events to show (filtered or all)
+  const eventsToShow = searchQuery.trim() ? filteredEvents : tgeEvents
 
   // Calculate scrollbar width dynamically
   React.useEffect(() => {
     const calculateScrollbarWidth = () => {
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+      // Method 1: Calculate using window dimensions
+      const method1 = window.innerWidth - document.documentElement.clientWidth
+      
+      // Method 2: Create a temporary element to measure
+      const tempDiv = document.createElement('div')
+      tempDiv.style.cssText = `
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        width: 100px;
+        height: 100px;
+        overflow: scroll;
+        visibility: hidden;
+      `
+      document.body.appendChild(tempDiv)
+      const method2 = tempDiv.offsetWidth - tempDiv.clientWidth
+      document.body.removeChild(tempDiv)
+      
+      // Use the maximum of both methods, with a minimum of 17px
+      const scrollbarWidth = Math.max(method1, method2, 17)
+      
       document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`)
+      console.log('Scrollbar width calculated:', { method1, method2, final: scrollbarWidth })
     }
     
+    // Calculate immediately
     calculateScrollbarWidth()
+    
+    // Recalculate on resize
     window.addEventListener('resize', calculateScrollbarWidth)
     
-    return () => window.removeEventListener('resize', calculateScrollbarWidth)
+    // Recalculate when DOM is ready
+    const timeoutId = setTimeout(calculateScrollbarWidth, 100)
+    
+    return () => {
+      window.removeEventListener('resize', calculateScrollbarWidth)
+      clearTimeout(timeoutId)
+    }
   }, [])
+
+  // Debug currentDate changes and sync with calendar
+  React.useEffect(() => {
+    console.log('currentDate changed:', {
+      iso: currentDate.toISOString(),
+      month: currentDate.getMonth(),
+      year: currentDate.getFullYear(),
+      formatted: format(currentDate, 'MMMM yyyy'),
+      isUserNavigating
+    })
+    
+    // If calendar ref exists, ensure it's showing the correct month
+    if (calendarRef.current && !isUserNavigating) {
+      const calendarApi = calendarRef.current.getApi()
+      const currentView = calendarApi.view
+      const currentViewDate = new Date(currentView.activeStart)
+      
+      // Only navigate if the calendar is showing a different month
+      if (currentViewDate.getMonth() !== currentDate.getMonth() || 
+          currentViewDate.getFullYear() !== currentDate.getFullYear()) {
+        console.log('Syncing calendar to currentDate:', currentDate.toISOString())
+        calendarApi.gotoDate(currentDate)
+      }
+    }
+  }, [currentDate, isUserNavigating])
+
+  // Search functionality
+  React.useEffect(() => {
+    const performSearch = async (): Promise<void> => {
+      if (!searchQuery.trim()) {
+        setFilteredEvents([])
+        setIsSearching(false)
+        return
+      }
+
+      setIsSearching(true)
+      
+      try {
+        const searchResult = await searchService.search(searchQuery.trim(), {}, {
+          limit: 50,
+          sortBy: 'relevance',
+          sortOrder: 'desc'
+        })
+        
+        setFilteredEvents(searchResult.events)
+        console.log(`Search for "${searchQuery}" found ${searchResult.events.length} events`)
+      } catch (error) {
+        console.error('Search error:', error)
+        setFilteredEvents([])
+      } finally {
+        setIsSearching(false)
+      }
+    }
+
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(performSearch, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
   // Handle theme change
   const handleThemeChange = (newTheme: string): void => {
@@ -928,17 +1049,45 @@ function App(): JSX.Element {
 
   const handleDatesSet = (dateInfo: DatesSetArg): void => {
     // Update current date when user navigates to different month
-    setCurrentDate(dateInfo.start)
+    console.log('DatesSet called:', { 
+      start: dateInfo.start, 
+      end: dateInfo.end, 
+      view: dateInfo.view.type,
+      isUserNavigating 
+    })
+    
+    // Only update if not from user navigation (dropdown selection)
+    if (!isUserNavigating) {
+      // Use the start of the month to ensure consistency
+      const monthStart = new Date(dateInfo.start.getFullYear(), dateInfo.start.getMonth(), 1)
+      setCurrentDate(monthStart)
+      console.log('Updated currentDate to:', monthStart.toISOString())
+    } else {
+      // Reset the flag
+      setIsUserNavigating(false)
+    }
   }
 
   // Handle month selection
   const handleMonthSelect = (monthIndex: number, year: number): void => {
     const newDate = new Date(year, monthIndex, 1)
+    console.log('Month selected:', { 
+      monthIndex, 
+      year, 
+      newDate: newDate.toISOString(),
+      monthName: months[monthIndex],
+      actualMonth: newDate.getMonth(),
+      actualYear: newDate.getFullYear()
+    })
+    
+    // Set flag to prevent handleDatesSet from overriding
+    setIsUserNavigating(true)
     setCurrentDate(newDate)
     setIsMonthDropdownOpen(false)
     
     // Navigate calendar to selected month
     if (calendarRef.current) {
+      console.log('Navigating calendar to:', newDate.toISOString())
       calendarRef.current.getApi().gotoDate(newDate)
     }
   }
@@ -949,39 +1098,42 @@ function App(): JSX.Element {
     'July', 'August', 'September', 'October', 'November', 'December'
   ]
 
-  // Generate years (current year ± 2)
+  // Generate years (current year ± 1)
   const currentYear = new Date().getFullYear()
-  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2]
+  const years = [currentYear - 1, currentYear, currentYear + 1]
 
   // Convert TGE events to calendar events
   const calendarEvents = React.useMemo(() => 
-    convertToCalendarEvents(tgeEvents), 
-    [tgeEvents]
+    convertToCalendarEvents(eventsToShow), 
+    [eventsToShow]
   )
 
   // Keyboard shortcut for search
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && !isSearchOpen) {
+      if (e.key === '/' && !isSearchModalOpen) {
         e.preventDefault()
-        setIsSearchOpen(true)
+        setIsSearchModalOpen(true)
       }
-      if (e.key === 'Escape' && isSearchOpen) {
-        setIsSearchOpen(false)
-        setSearchQuery('')
+      if (e.key === 'Escape') {
+        setIsSearchModalOpen(false)
+        setIsLanguageDropdownOpen(false)
+        setIsThemeDropdownOpen(false)
+        setIsMonthDropdownOpen(false)
+        setIsMobileMenuOpen(false)
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isSearchOpen])
+  }, [isSearchModalOpen])
 
-  // Focus search input when modal opens
+  // Add events to store when they're loaded
   React.useEffect(() => {
-    if (isSearchOpen && searchInputRef.current) {
-      searchInputRef.current.focus()
+    if (tgeEvents.length > 0) {
+      addEvents(tgeEvents)
     }
-  }, [isSearchOpen])
+  }, [tgeEvents, addEvents])
 
   // Close dropdowns and mobile menu when clicking outside
   React.useEffect(() => {
@@ -1043,7 +1195,9 @@ function App(): JSX.Element {
         position: 'fixed',
         top: '48px', // Adjusted for banner height
         left: 0,
-        width: 'calc(100vw - var(--scrollbar-width, 17px))', // Dynamic scrollbar width
+        width: 'calc(100vw - var(--scrollbar-width, 17px))',
+        maxWidth: 'calc(100vw - 17px)', // Fallback to ensure it never overlaps
+        right: 'var(--scrollbar-width, 17px)', // Ensure it doesn't extend beyond scrollbar
         zIndex: 50,
         background: 'transparent',
         backdropFilter: 'blur(24px)',
@@ -1101,7 +1255,9 @@ function App(): JSX.Element {
               <input
                 type="text"
                 placeholder="Search tokens and events..."
-                onClick={() => setIsSearchOpen(true)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchOpen(true)}
                 style={{
                   width: '100%',
                   padding: '12px 60px 12px 44px',
@@ -1111,9 +1267,8 @@ function App(): JSX.Element {
                   fontSize: '16px',
                   outline: 'none',
                   color: '#334155',
-                  cursor: 'pointer'
+                  cursor: 'text'
                 }}
-                readOnly
               />
               <div style={{
                 position: 'absolute',
@@ -1475,10 +1630,10 @@ function App(): JSX.Element {
             </div>
 
             {/* Mobile Theme Selector */}
-            <div>
+      <div>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                 Theme
-              </div>
+      </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {themes.map(themeOption => (
                   <motion.button
@@ -1582,36 +1737,263 @@ function App(): JSX.Element {
                 }}>
                   Live TGE Calendar
                 </h2>
-                <div style={{
-                  fontSize: '14px',
-                  color: theme === 'dark' ? '#9ca3af' : '#6b7280',
-                  marginTop: '8px'
-                }}>
-                  {isLoading ? (
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        style={{ width: '12px', height: '12px' }}
-                      >
-                        ⏳
-                      </motion.div>
-                      Loading TGE events...
-                    </span>
-                  ) : error ? (
-                    `Using cached data`
-                  ) : (
-                    `${tgeEvents.length} events this month`
-                  )}
-                </div>
               </motion.div>
               
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 1.0 }}
                 className="calendar-container"
               >
+                {/* Custom Calendar Header with Month Dropdown */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                  position: 'relative'
+                }}>
+                  <div 
+                    key={`month-dropdown-${currentDate.getFullYear()}-${currentDate.getMonth()}`}
+                    style={{ position: 'relative' }} 
+                    data-dropdown="month"
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsMonthDropdownOpen(!isMonthDropdownOpen)
+                      }}
+                      style={{
+                        background: 'rgba(248, 250, 252, 0.9)',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#374151',
+                        minWidth: '200px',
+                        justifyContent: 'center',
+                        backdropFilter: 'blur(8px)',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      <span>{format(currentDate, 'MMMM yyyy')}</span>
+                      <svg 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        style={{
+                          transform: isMonthDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s'
+                        }}
+                      >
+                        <polyline points="6,9 12,15 18,9"/>
+                      </svg>
+                    </motion.button>
+
+                    <AnimatePresence>
+                      {isMonthDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'white',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+                            overflow: 'hidden',
+                            minWidth: '300px',
+                            zIndex: 1000,
+                            marginTop: '8px'
+                          }}
+                        >
+                          <div style={{ padding: '16px' }}>
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: 'repeat(3, 1fr)', 
+                              gap: '8px',
+                              marginBottom: '16px'
+                            }}>
+                              {months.map((month, index) => (
+                                <motion.button
+                                  key={month}
+                                  whileHover={{ backgroundColor: '#f8fafc' }}
+                                  onClick={() => handleMonthSelect(index, currentDate.getFullYear())}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: currentDate.getMonth() === index ? '#ec4899' : 'white',
+                                    color: currentDate.getMonth() === index ? 'white' : '#64748b',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  {month}
+                                </motion.button>
+                              ))}
+                            </div>
+                            
+                            <div style={{ 
+                              display: 'flex', 
+                              gap: '8px', 
+                              justifyContent: 'center',
+                              borderTop: '1px solid #f1f5f9',
+                              paddingTop: '16px'
+                            }}>
+                              {years.map(year => (
+                                <motion.button
+                                  key={year}
+                                  whileHover={{ backgroundColor: '#f8fafc' }}
+                                  onClick={() => handleMonthSelect(currentDate.getMonth(), year)}
+                                  style={{
+                                    padding: '8px 16px',
+                                    background: currentDate.getFullYear() === year ? '#ec4899' : 'white',
+                                    color: currentDate.getFullYear() === year ? 'white' : '#64748b',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '8px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  {year}
+                                </motion.button>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Events Count Text */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.2 }}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: '20px'
+                  }}
+                >
+                  {isLoading ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 24px',
+                        background: theme === 'dark' 
+                          ? 'rgba(59, 130, 246, 0.1)' 
+                          : 'rgba(59, 130, 246, 0.05)',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)'}`,
+                        borderRadius: '12px',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          border: `2px solid ${theme === 'dark' ? '#3b82f6' : '#2563eb'}`,
+                          borderTop: `2px solid transparent`,
+                          borderRadius: '50%'
+                        }}
+                      />
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#60a5fa' : '#2563eb'
+                      }}>
+                        Loading TGE events...
+                      </span>
+                    </motion.div>
+                  ) : error ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        background: theme === 'dark' 
+                          ? 'rgba(245, 158, 11, 0.1)' 
+                          : 'rgba(245, 158, 11, 0.05)',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)'}`,
+                        borderRadius: '8px',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <span style={{ fontSize: '14px' }}>⚠️</span>
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: theme === 'dark' ? '#fbbf24' : '#d97706'
+                      }}>
+                        Using cached data
+                      </span>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 20px',
+                        background: theme === 'dark' 
+                          ? 'rgba(16, 185, 129, 0.1)' 
+                          : 'rgba(16, 185, 129, 0.05)',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)'}`,
+                        borderRadius: '12px',
+                        backdropFilter: 'blur(8px)',
+                        boxShadow: theme === 'dark' 
+                          ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' 
+                          : '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      <span style={{ fontSize: '16px' }}>📅</span>
+                      <span style={{
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        color: theme === 'dark' ? '#34d399' : '#059669',
+                        letterSpacing: '0.025em'
+                      }}>
+                        {tgeEvents.length} event{tgeEvents.length !== 1 ? 's' : ''} this month
+                      </span>
+                    </motion.div>
+                  )}
+                </motion.div>
+
                 <FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, interactionPlugin]}
@@ -1620,12 +2002,19 @@ function App(): JSX.Element {
                   events={calendarEvents}
                   eventClick={handleEventClick}
                   datesSet={handleDatesSet}
+                  viewDidMount={(viewInfo) => {
+                    console.log('View mounted:', viewInfo)
+                    // Ensure the dropdown reflects the current view
+                    const monthStart = new Date(viewInfo.start.getFullYear(), viewInfo.start.getMonth(), 1)
+                    setCurrentDate(monthStart)
+                  }}
                   height={700}
                   headerToolbar={{
                     left: 'prev,next',
-                    center: 'title',
+                    center: '',
                     right: ''
                   }}
+                  titleFormat={{ year: 'numeric', month: 'long' }}
                   eventDisplay='block'
                   dayMaxEvents={3}
                   firstDay={1}
@@ -1633,6 +2022,13 @@ function App(): JSX.Element {
                   aspectRatio={1.8}
                   contentHeight='auto'
                   expandRows={true}
+                  displayEventTime={false}
+                  displayEventEnd={false}
+                  eventTimeFormat={{
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: false
+                  }}
                   eventDidMount={(info) => {
                     try {
                       // Add hover effects to events safely
@@ -1663,134 +2059,6 @@ function App(): JSX.Element {
           </div>
         </motion.div>
 
-        {/* Month Dropdown */}
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
-          <div style={{ position: 'relative' }} data-dropdown="month">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsMonthDropdownOpen(!isMonthDropdownOpen)
-              }}
-              style={{
-                background: 'rgba(248, 250, 252, 0.9)',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '12px 20px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#374151',
-                minWidth: '200px',
-                justifyContent: 'center'
-              }}
-            >
-              <span>{format(currentDate, 'MMMM yyyy')}</span>
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-                style={{
-                  transform: isMonthDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s'
-                }}
-              >
-                <polyline points="6,9 12,15 18,9"/>
-              </svg>
-            </motion.button>
-
-            <AnimatePresence>
-              {isMonthDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: 'white',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-                    overflow: 'hidden',
-                    minWidth: '300px',
-                    zIndex: 1000,
-                    marginTop: '8px'
-                  }}
-                >
-                  <div style={{ padding: '16px' }}>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, 1fr)', 
-                      gap: '8px',
-                      marginBottom: '16px'
-                    }}>
-                      {months.map((month, index) => (
-                        <motion.button
-                          key={month}
-                          whileHover={{ backgroundColor: '#f8fafc' }}
-                          onClick={() => handleMonthSelect(index, currentDate.getFullYear())}
-                          style={{
-                            padding: '8px 12px',
-                            background: currentDate.getMonth() === index ? '#ec4899' : 'white',
-                            color: currentDate.getMonth() === index ? 'white' : '#64748b',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {month}
-                        </motion.button>
-                      ))}
-                    </div>
-                    
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '8px', 
-                      justifyContent: 'center',
-                      borderTop: '1px solid #f1f5f9',
-                      paddingTop: '16px'
-                    }}>
-                      {years.map(year => (
-                        <motion.button
-                          key={year}
-                          whileHover={{ backgroundColor: '#f8fafc' }}
-                          onClick={() => handleMonthSelect(currentDate.getMonth(), year)}
-                          style={{
-                            padding: '8px 16px',
-                            background: currentDate.getFullYear() === year ? '#ec4899' : 'white',
-                            color: currentDate.getFullYear() === year ? 'white' : '#64748b',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {year}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
 
 
         {/* Animated Stats like donate.gg */}
@@ -1927,8 +2195,8 @@ function App(): JSX.Element {
               margin: 0
             }}>
               © 2025 TGE Calendar. All rights reserved.
-            </p>
-          </div>
+        </p>
+      </div>
 
           {/* Right side - Donate, FAQ, and X links */}
           <div style={{ 
@@ -2101,9 +2369,80 @@ function App(): JSX.Element {
                 {/* Search results */}
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                   {searchQuery ? (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                      Searching for "{searchQuery}"...
-                    </div>
+                    isSearching ? (
+                      <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '16px',
+                            height: '16px',
+                            border: '2px solid #e2e8f0',
+                            borderTop: '2px solid #3b82f6',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }} />
+                          Searching for "{searchQuery}"...
+                        </div>
+                      </div>
+                    ) : filteredEvents.length > 0 ? (
+                      <div>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '14px', fontWeight: '500' }}>
+                          Found {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+                        </div>
+                        {filteredEvents.map((event, index) => (
+                          <div
+                            key={event.id}
+                            onClick={() => {
+                              setSelectedEvent(event)
+                              setIsSearchOpen(false)
+                            }}
+                            style={{
+                              padding: '16px',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: 0 }}>
+                                {event.symbol ? `${event.symbol} - ${event.name}` : event.name}
+                              </h3>
+                              <span style={{ 
+                                fontSize: '12px', 
+                                color: '#64748b',
+                                background: '#f1f5f9',
+                                padding: '4px 8px',
+                                borderRadius: '4px'
+                              }}>
+                                {format(new Date(event.startDate), 'MMM dd')}
+                              </span>
+                            </div>
+                            {event.description && (
+                              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 8px 0', lineHeight: '1.4' }}>
+                                {event.description.length > 100 ? `${event.description.substring(0, 100)}...` : event.description}
+                              </p>
+                            )}
+                            <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' }}>
+                              {event.blockchain && (
+                                <span>🌐 {event.blockchain}</span>
+                              )}
+                              {event.credibility && (
+                                <span>⭐ {event.credibility}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                        No events found for "{searchQuery}"
+                      </div>
+                    )
                   ) : (
                     <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
                       Start typing to search for tokens and TGE events
@@ -2203,7 +2542,19 @@ function App(): JSX.Element {
                 style={{ marginBottom: '24px' }}
               >
                 <p style={{ color: '#6b7280', marginBottom: '8px' }}>
-                  <strong>Date:</strong> {new Date(selectedEvent.startDate).toLocaleDateString()}
+                  <strong>Date:</strong> {new Date(selectedEvent.startDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+                <p style={{ color: '#6b7280', marginBottom: '8px' }}>
+                  <strong>Time:</strong> {new Date(selectedEvent.startDate).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
                 </p>
                 {selectedEvent.blockchain && (
                   <p style={{ color: '#6b7280', marginBottom: '8px' }}>
@@ -2286,6 +2637,13 @@ function App(): JSX.Element {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Search Modal */}
+      <SearchModal 
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        theme={theme}
+      />
 
       {/* Bug Report Modal */}
       <AnimatePresence>
