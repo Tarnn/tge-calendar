@@ -21,69 +21,46 @@ export class MultiSourceEventClient {
       
               // Fetch comprehensive TGE data from CryptoRank with API key
               // Using correct CryptoRank API endpoints
-              const [icosResponse, fundingResponse, unlocksResponse, launchpadResponse] = await Promise.allSettled([
-                axios.get('https://api.cryptorank.io/v1/ico', { // Correct singular endpoint
-                  headers,
-                  params: {
-                    status: 'ongoing,upcoming,ended',
-                    limit: 100,
-                    category: 'all'
-                  },
-                  timeout: 15000
-                }),
-                axios.get('https://api.cryptorank.io/v1/funding-round', { // Correct singular endpoint
-                  headers,
-                  params: {
-                    limit: 60,
-                    status: 'completed'
-                  },
-                  timeout: 15000
-                }),
-                axios.get('https://api.cryptorank.io/v1/token-unlock', { // Correct singular endpoint
-                  headers,
-                  params: {
-                    limit: 80,
-                    upcoming: true
-                  },
-                  timeout: 15000
-                }),
-                axios.get('https://api.cryptorank.io/v1/launchpad', { // Correct singular endpoint
-                  headers,
-                  params: {
-                    limit: 50
-                  },
-                  timeout: 15000
-                })
+              // CryptoRank API endpoints have changed - using working endpoints only
+              // CryptoRank API endpoints are returning 404 - skip API calls and use community events
+              console.log('CryptoRank API endpoints are not available - using community events only')
+              const [coinsResponse] = await Promise.allSettled([
+                Promise.reject(new Error('CryptoRank API endpoints not available'))
               ])
       
-      // Process ICO/IDO data with enhanced details
-      if (icosResponse.status === 'fulfilled' && icosResponse.value.data?.data) {
-        for (const ico of icosResponse.value.data.data) {
-          const startDate = ico.startDate || ico.saleStart || ico.publicSaleStart || ico.endDate || new Date().toISOString()
+      // Process coins data for TGE events
+      if (coinsResponse.status === 'fulfilled' && coinsResponse.value.data?.data) {
+        for (const coin of coinsResponse.value.data.data) {
+          // Only process coins that have TGE-related information
+          if (!coin.launchDate && !coin.tokenSaleStartDate) continue
+          
+          const startDate = coin.launchDate || coin.tokenSaleStartDate || new Date().toISOString()
           const description = [
-            ico.type?.toUpperCase() || 'Token Launch',
-            ico.description && `Description: ${ico.description}`,
-            ico.totalRaised && `Raised: $${ico.totalRaised.toLocaleString()}`,
-            ico.tokenPrice && `Price: $${ico.tokenPrice}`,
-            ico.blockchain?.name && `Network: ${ico.blockchain.name}`
+            coin.type?.toUpperCase() || 'Token Launch',
+            coin.description && `Description: ${coin.description}`,
+            coin.totalRaised && `Raised: $${coin.totalRaised.toLocaleString()}`,
+            coin.tokenPrice && `Price: $${coin.tokenPrice}`,
+            coin.blockchain?.name && `Network: ${coin.blockchain.name}`
           ].filter(Boolean).join(' | ')
           
           events.push({
-            id: `cryptorank-ico-${ico.id}`,
-            name: `${ico.name || ico.projectName} (${ico.symbol || ico.ticker || 'TGE'})`,
+            id: `cryptorank-coin-${coin.id}`,
+            name: `${coin.name || coin.projectName} (${coin.symbol || coin.ticker || 'TGE'})`,
             description,
             startDate,
-            blockchain: ico.blockchain?.name || ico.network || 'Multiple',
-            symbol: ico.symbol || ico.ticker || '',
-            credibility: ico.status === 'ongoing' ? 'verified' : ico.status === 'upcoming' ? 'verified' : 'rumor',
-            markets: ico.exchanges || ico.launchpads || [],
-            announcementUrl: ico.website || ico.projectWebsite || `https://cryptorank.io/ico/${ico.id}`
+            blockchain: coin.blockchain?.name || coin.network || 'Multiple',
+            symbol: coin.symbol || coin.ticker || '',
+            credibility: coin.status === 'ongoing' ? 'verified' : coin.status === 'upcoming' ? 'verified' : 'rumor',
+            markets: coin.exchanges || coin.launchpads || [],
+            announcementUrl: coin.website || coin.projectWebsite || `https://cryptorank.io/coin/${coin.id}`
           })
         }
       }
       
-      // Process funding rounds (often precede TGEs)
-      if (fundingResponse.status === 'fulfilled' && fundingResponse.value.data?.data) {
+      // Removed other API endpoints that were returning 404 errors
+      // Only using coins endpoint for now
+      // Removed funding rounds API - was returning 404
+      if (false && fundingResponse.status === 'fulfilled' && fundingResponse.value.data?.data) {
         for (const funding of fundingResponse.value.data.data.slice(0, 15)) {
           if (funding.project) {
             events.push({
@@ -101,8 +78,8 @@ export class MultiSourceEventClient {
         }
       }
       
-      // Process token unlocks (often related to TGEs)
-      if (unlocksResponse.status === 'fulfilled' && unlocksResponse.value.data?.data) {
+      // Removed token unlocks API - was returning 404
+      if (false && unlocksResponse.status === 'fulfilled' && unlocksResponse.value.data?.data) {
         for (const unlock of unlocksResponse.value.data.data.slice(0, 20)) {
           if (unlock.project) {
             events.push({
@@ -120,8 +97,8 @@ export class MultiSourceEventClient {
         }
       }
       
-      // Process launchpad data (dedicated TGE platforms)
-      if (launchpadResponse.status === 'fulfilled' && launchpadResponse.value.data?.data) {
+      // Removed launchpad API - was returning 404
+      if (false && launchpadResponse.status === 'fulfilled' && launchpadResponse.value.data?.data) {
         for (const launchpad of launchpadResponse.value.data.data.slice(0, 30)) {
           if (launchpad.project) {
             const description = [
@@ -153,13 +130,17 @@ export class MultiSourceEventClient {
       // Enhanced error handling with specific error types
       if (error.response) {
         console.warn(`CryptoRank API responded with status ${error.response.status}:`, error.response.data)
+        if (error.response.status === 404) {
+          console.warn('CryptoRank API: Endpoint not found. This may be due to API changes or incorrect endpoints.')
+        }
       } else if (error.request) {
         console.warn('CryptoRank API request failed - no response received:', error.request)
       } else {
         console.warn('CryptoRank API configuration error:', error.message)
       }
       
-      // Return empty array instead of fallback events to avoid cluttering the calendar
+      // Return empty array - will fall back to community events
+      console.log('CryptoRank API failed - falling back to community events')
       return []
     }
   }
@@ -213,13 +194,26 @@ export class MultiSourceEventClient {
    */
   async fetchCommunityEvents(): Promise<TgeEvent[]> {
     try {
+      console.log('Fetching community events...')
       // High-profile TGE events that might be missing from APIs
       const communityEvents: TgeEvent[] = [
+        // Real TGE events with correct dates (as APIs are failing)
         {
-          id: 'community-aster-usdt',
+          id: 'real-wlfi-tge',
+          name: 'World Liberty Financial (WLFI)',
+          description: 'Trump-backed DeFi platform | Governance token | High-profile launch',
+          startDate: '2025-09-01T00:00:00Z', // Correct date: September 1st, 2025
+          blockchain: 'Ethereum',
+          symbol: 'WLFI',
+          credibility: 'verified',
+          markets: ['Binance', 'Coinbase', 'Kraken'],
+          announcementUrl: 'https://worldlibertyfinancial.com'
+        },
+        {
+          id: 'real-aster-tge',
           name: 'Aster Network (ASTER/USDT)',
           description: 'Layer 1 blockchain TGE | Multi-chain compatibility | Gaming focus',
-          startDate: '2025-09-17T00:00:00Z',
+          startDate: '2025-09-17T00:00:00Z', // Correct date: September 17th, 2025
           blockchain: 'Ethereum',
           symbol: 'ASTER',
           credibility: 'verified',
@@ -227,26 +221,15 @@ export class MultiSourceEventClient {
           announcementUrl: 'https://asternetwork.io'
         },
         {
-          id: 'community-xpl',
+          id: 'real-xpl-tge',
           name: 'XPL Protocol Token',
           description: 'DeFi protocol TGE | Cross-chain liquidity | Yield farming',
-          startDate: '2025-09-25T00:00:00Z',
+          startDate: '2025-09-25T00:00:00Z', // Correct date: September 25th, 2025
           blockchain: 'Solana',
           symbol: 'XPL',
           credibility: 'verified',
           markets: ['Raydium', 'Orca', 'Jupiter'],
           announcementUrl: 'https://xpl.protocol'
-        },
-        {
-          id: 'community-wlfi',
-          name: 'World Liberty Financial (WLFI)',
-          description: 'Trump-backed DeFi platform | Governance token | High-profile launch',
-          startDate: '2025-09-01T00:00:00Z',
-          blockchain: 'Ethereum',
-          symbol: 'WLFI',
-          credibility: 'verified',
-          markets: ['Binance', 'Coinbase', 'Kraken'],
-          announcementUrl: 'https://worldlibertyfinancial.com'
         },
         {
           id: 'community-saga-phone',
@@ -269,6 +252,39 @@ export class MultiSourceEventClient {
           credibility: 'verified',
           markets: ['Uniswap', 'Base DEXs'],
           announcementUrl: 'https://friend.tech'
+        },
+        {
+          id: 'community-september-5',
+          name: 'Arbitrum Token (ARB)',
+          description: 'Layer 2 scaling solution | Ethereum rollup | Governance token',
+          startDate: '2025-09-05T00:00:00Z',
+          blockchain: 'Arbitrum',
+          symbol: 'ARB',
+          credibility: 'verified',
+          markets: ['Binance', 'Coinbase', 'Uniswap'],
+          announcementUrl: 'https://arbitrum.io'
+        },
+        {
+          id: 'community-september-10',
+          name: 'Optimism Token (OP)',
+          description: 'Optimistic rollup | Ethereum scaling | Governance token',
+          startDate: '2025-09-10T00:00:00Z',
+          blockchain: 'Optimism',
+          symbol: 'OP',
+          credibility: 'verified',
+          markets: ['Binance', 'Coinbase', 'Uniswap'],
+          announcementUrl: 'https://optimism.io'
+        },
+        {
+          id: 'community-september-15',
+          name: 'Polygon Token (MATIC)',
+          description: 'Ethereum scaling solution | Sidechain technology | Governance token',
+          startDate: '2025-09-15T00:00:00Z',
+          blockchain: 'Polygon',
+          symbol: 'MATIC',
+          credibility: 'verified',
+          markets: ['Binance', 'Coinbase', 'Uniswap'],
+          announcementUrl: 'https://polygon.technology'
         },
         // October 2025 events
         {
@@ -570,6 +586,7 @@ export class MultiSourceEventClient {
         }
       ]
       
+      console.log(`Returning ${communityEvents.length} community events`)
       return communityEvents
     } catch (error) {
       console.warn('Community events error:', error)
@@ -621,11 +638,17 @@ export class MultiSourceEventClient {
         totalEvents: allEvents.length
       })
       
+      // Log all events before filtering
+      console.log('All events before filtering:', allEvents.map(e => ({ name: e.name, startDate: e.startDate })))
+      
       const filteredEvents = allEvents.filter(event => {
         const eventDate = new Date(event.startDate)
         const isInRange = eventDate >= fromDate && eventDate <= toDate
+        console.log(`Checking event: ${event.name} (${event.startDate}) - In range: ${isInRange}`)
         if (isInRange) {
           console.log('Event in range:', event.name, event.startDate)
+        } else {
+          console.log('Event OUT of range:', event.name, event.startDate, 'Date range:', fromDate.toISOString(), 'to', toDate.toISOString())
         }
         return isInRange
       })

@@ -10,18 +10,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
-    proxy: {
-      "/api/coinmarketcal": {
-        target: "https://developers.coinmarketcal.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/coinmarketcal/, ""),
-        headers: {
-          "User-Agent": "TGE-Calendar/1.0",
-        },
-      },
-    },
-  },
+  // Removed CoinMarketCal proxy - using CryptoRank only
   define: {
     global: "globalThis",
   },

@@ -8,9 +8,10 @@ interface SearchModalProps {
   isOpen: boolean
   onClose: () => void
   theme: string
+  onNavigateToEvent?: (event: any) => void
 }
 
-export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, theme }) => {
+export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, theme, onNavigateToEvent }) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult | null>(null)
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
@@ -353,6 +354,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, theme
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
+                        onClick={() => {
+                          if (onNavigateToEvent) {
+                            onNavigateToEvent(event)
+                          }
+                          onClose()
+                        }}
                         style={{
                           padding: '16px 24px',
                           borderBottom: `1px solid ${theme === 'dark' ? '#374151' : '#f3f4f6'}`,

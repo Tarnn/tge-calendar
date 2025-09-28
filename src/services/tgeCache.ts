@@ -2,42 +2,42 @@ import { format, startOfMonth, endOfMonth } from "date-fns"
 import type { TgeEvent } from "../types/events"
 
 /**
- * TGE Cache Service - Manages month-based caching of TGE events
- * Ensures no TGE is missed and prevents redundant API calls
+ * TGE Cache Service - Manages year-based caching of TGE events
+ * Fetches full year data once, then filters by month for better performance
  */
 export class TgeCacheService {
   private cache = new Map<string, CachedMonth>()
-  private readonly CACHE_EXPIRY = 1000 * 60 * 30 // 30 minutes
-  private readonly MAX_CACHE_SIZE = 24 // Cache up to 24 months
+  private readonly CACHE_EXPIRY = 1000 * 60 * 60 * 24 // 24 hours (longer for year data)
+  private readonly MAX_CACHE_SIZE = 3 // Cache up to 3 years
 
   /**
-   * Get cached events for a specific month
+   * Get cached events for a specific year (returns full year data)
    */
   getCachedEvents(date: Date): TgeEvent[] | null {
-    const monthKey = this.getMonthKey(date)
-    const cached = this.cache.get(monthKey)
+    const yearKey = this.getYearKey(date)
+    const cached = this.cache.get(yearKey)
     
     if (!cached) {
-      console.log(`No cache found for ${monthKey}`)
+      console.log(`No cache found for year ${yearKey}`)
       return null
     }
     
     // Check if cache is expired
     if (Date.now() - cached.timestamp > this.CACHE_EXPIRY) {
-      console.log(`Cache expired for ${monthKey}, removing...`)
-      this.cache.delete(monthKey)
+      console.log(`Cache expired for year ${yearKey}, removing...`)
+      this.cache.delete(yearKey)
       return null
     }
     
-    console.log(`Cache hit for ${monthKey}: ${cached.events.length} events`)
+    console.log(`Cache hit for year ${yearKey}: ${cached.events.length} events`)
     return cached.events
   }
 
   /**
-   * Cache events for a specific month
+   * Cache events for a specific year
    */
   cacheEvents(date: Date, events: TgeEvent[]): void {
-    const monthKey = this.getMonthKey(date)
+    const yearKey = this.getYearKey(date)
     
     // Remove oldest cache entries if we're at max size
     if (this.cache.size >= this.MAX_CACHE_SIZE) {
@@ -46,13 +46,13 @@ export class TgeCacheService {
       console.log(`Removed oldest cache entry: ${oldestKey}`)
     }
     
-    this.cache.set(monthKey, {
+    this.cache.set(yearKey, {
       events: [...events], // Create a copy to avoid reference issues
       timestamp: Date.now(),
-      monthKey
+      monthKey: yearKey // Reusing the field name for compatibility
     })
     
-    console.log(`Cached ${events.length} events for ${monthKey}`)
+    console.log(`Cached ${events.length} events for year ${yearKey}`)
   }
 
   /**
@@ -146,6 +146,10 @@ export class TgeCacheService {
    */
   private getMonthKey(date: Date): string {
     return format(date, 'yyyy-MM')
+  }
+
+  private getYearKey(date: Date): string {
+    return format(date, 'yyyy')
   }
 
   /**

@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import { startOfMonth, endOfMonth, format } from "date-fns"
-import { CoinMarketCalClient } from "../api/coinmarketcal"
+import { tgeEventsClient } from "../api/tgeEvents"
 import { tgeEventsStore } from "../services/tgeEventsStore"
 import type { TgeEvent, FetchEventsParams } from "../types/events"
 
-const client = new CoinMarketCalClient()
+// Using singleton client
 
 export function useTgeEvents(currentDate: Date) {
   const monthStart = startOfMonth(currentDate)
@@ -15,6 +15,10 @@ export function useTgeEvents(currentDate: Date) {
     to: format(monthEnd, 'yyyy-MM-dd'),
     pageSize: 100
   }
+  
+  console.log('useTgeEvents params:', params)
+  console.log('monthStart:', monthStart.toISOString())
+  console.log('monthEnd:', monthEnd.toISOString())
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tge-events', format(currentDate, 'yyyy-MM')],
@@ -33,7 +37,7 @@ export function useTgeEvents(currentDate: Date) {
 
       // If no cached events, fetch from API
       console.log(`Fetching fresh events for ${format(currentDate, 'yyyy-MM')}...`)
-      const apiResult = await client.fetchEvents(params)
+      const apiResult = await tgeEventsClient.fetchEvents(params)
       
       // Add to store for future use
       if (apiResult.events.length > 0) {

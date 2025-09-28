@@ -867,6 +867,7 @@ function App(): JSX.Element {
   React.useEffect(() => {
     // Clear cache to force reload of updated TGE dates
     localStorage.removeItem('tge_events_store')
+    localStorage.removeItem('tge_cache')
     console.log('Cache cleared to load updated TGE dates')
   }, [])
 
@@ -910,8 +911,8 @@ function App(): JSX.Element {
     })
   }
 
-  // Determine which events to show (filtered or all)
-  const eventsToShow = searchQuery.trim() ? filteredEvents : tgeEvents
+  // Always show all calendar events - search should not filter the calendar
+  const eventsToShow = tgeEvents
 
   // Calculate scrollbar width dynamically
   React.useEffect(() => {
@@ -1059,12 +1060,14 @@ function App(): JSX.Element {
     // Only update if not from user navigation (dropdown selection)
     if (!isUserNavigating) {
       // Use the start of the month to ensure consistency
-      const monthStart = new Date(dateInfo.start.getFullYear(), dateInfo.start.getMonth(), 1)
-      setCurrentDate(monthStart)
-      console.log('Updated currentDate to:', monthStart.toISOString())
+      if (dateInfo && dateInfo.start) {
+        const monthStart = new Date(dateInfo.start.getFullYear(), dateInfo.start.getMonth(), 1)
+        setCurrentDate(monthStart)
+        console.log('Updated currentDate to:', monthStart.toISOString())
+      }
     } else {
-      // Reset the flag
-      setIsUserNavigating(false)
+      console.log('Ignoring datesSet due to user navigation')
+      // Don't reset the flag here - let handleMonthSelect handle it
     }
   }
 
@@ -1089,6 +1092,12 @@ function App(): JSX.Element {
     if (calendarRef.current) {
       console.log('Navigating calendar to:', newDate.toISOString())
       calendarRef.current.getApi().gotoDate(newDate)
+      
+      // Reset the flag after a short delay to allow handleDatesSet to be ignored
+      setTimeout(() => {
+        setIsUserNavigating(false)
+        console.log('Reset isUserNavigating flag after calendar navigation')
+      }, 100)
     }
   }
 
@@ -1107,6 +1116,10 @@ function App(): JSX.Element {
     convertToCalendarEvents(eventsToShow), 
     [eventsToShow]
   )
+  
+  // Debug logging
+  console.log('Events to show:', eventsToShow.length, eventsToShow)
+  console.log('Calendar events:', calendarEvents.length, calendarEvents)
 
   // Keyboard shortcut for search
   React.useEffect(() => {
@@ -2005,8 +2018,10 @@ function App(): JSX.Element {
                   viewDidMount={(viewInfo) => {
                     console.log('View mounted:', viewInfo)
                     // Ensure the dropdown reflects the current view
-                    const monthStart = new Date(viewInfo.start.getFullYear(), viewInfo.start.getMonth(), 1)
-                    setCurrentDate(monthStart)
+                    if (viewInfo && viewInfo.view && viewInfo.view.activeStart) {
+                      const monthStart = new Date(viewInfo.view.activeStart.getFullYear(), viewInfo.view.activeStart.getMonth(), 1)
+                      setCurrentDate(monthStart)
+                    }
                   }}
                   height={700}
                   headerToolbar={{
@@ -2292,186 +2307,29 @@ function App(): JSX.Element {
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
             </motion.a>
+            
+            <motion.a
+              href="https://github.com/Tarnn/tge-calendar"
+              target="_blank"
+              rel="noopener noreferrer"
+              whileHover={{ scale: 1.1, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                color: '#6b7280',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+            </motion.a>
           </div>
         </div>
       </footer>
 
-      {/* Search Modal */}
-      <AnimatePresence>
-        {isSearchOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.6)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'center',
-              zIndex: 100,
-              paddingTop: '120px',
-              padding: '120px 16px 16px 16px'
-            }}
-            onClick={() => setIsSearchOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              style={{
-                background: 'white',
-                borderRadius: '16px',
-                width: '100%',
-                maxWidth: '600px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                overflow: 'hidden'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ padding: '24px' }}>
-                <div style={{ position: 'relative', marginBottom: '24px' }}>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search tokens and TGE events..."
-                    style={{
-                      width: '100%',
-                      padding: '16px 16px 16px 48px',
-                      border: '2px solid #f1f5f9',
-                      borderRadius: '12px',
-                      fontSize: '16px',
-                      outline: 'none',
-                      color: '#334155'
-                    }}
-                  />
-                  <svg 
-                    style={{
-                      position: 'absolute',
-                      left: '16px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      width: '20px',
-                      height: '20px',
-                      color: '#64748b'
-                    }}
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-
-                {/* Search results */}
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {searchQuery ? (
-                    isSearching ? (
-                      <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '16px',
-                            height: '16px',
-                            border: '2px solid #e2e8f0',
-                            borderTop: '2px solid #3b82f6',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                          }} />
-                          Searching for "{searchQuery}"...
-                        </div>
-                      </div>
-                    ) : filteredEvents.length > 0 ? (
-                      <div>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '14px', fontWeight: '500' }}>
-                          Found {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
-                        </div>
-                        {filteredEvents.map((event, index) => (
-                          <div
-                            key={event.id}
-                            onClick={() => {
-                              setSelectedEvent(event)
-                              setIsSearchOpen(false)
-                            }}
-                            style={{
-                              padding: '16px',
-                              borderBottom: '1px solid #f1f5f9',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: 0 }}>
-                                {event.symbol ? `${event.symbol} - ${event.name}` : event.name}
-                              </h3>
-                              <span style={{ 
-                                fontSize: '12px', 
-                                color: '#64748b',
-                                background: '#f1f5f9',
-                                padding: '4px 8px',
-                                borderRadius: '4px'
-                              }}>
-                                {format(new Date(event.startDate), 'MMM dd')}
-                              </span>
-                            </div>
-                            {event.description && (
-                              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 8px 0', lineHeight: '1.4' }}>
-                                {event.description.length > 100 ? `${event.description.substring(0, 100)}...` : event.description}
-                              </p>
-                            )}
-                            <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' }}>
-                              {event.blockchain && (
-                                <span>🌐 {event.blockchain}</span>
-                              )}
-                              {event.credibility && (
-                                <span>⭐ {event.credibility}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                        No events found for "{searchQuery}"
-                      </div>
-                    )
-                  ) : (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
-                      Start typing to search for tokens and TGE events
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ 
-                  marginTop: '16px', 
-                  padding: '16px', 
-                  background: '#f8fafc', 
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: '#64748b',
-                  textAlign: 'center'
-                }}>
-                  Press <kbd style={{ 
-                    background: 'white', 
-                    border: '1px solid #e2e8f0', 
-                    borderRadius: '4px', 
-                    padding: '2px 6px',
-                    fontFamily: 'monospace'
-                  }}>ESC</kbd> to close
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Old search modal removed - using SearchModal component */}
 
       {/* Enhanced Event Modal */}
       <AnimatePresence>
@@ -2643,6 +2501,25 @@ function App(): JSX.Element {
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
         theme={theme}
+        onNavigateToEvent={(event) => {
+          // Navigate calendar to the event's month
+          const eventDate = new Date(event.startDate)
+          const eventMonth = new Date(eventDate.getFullYear(), eventDate.getMonth(), 1)
+          
+          // Set the calendar to the event's month
+          setCurrentDate(eventMonth)
+          setIsUserNavigating(true)
+          
+          // Navigate the calendar if ref exists
+          if (calendarRef.current) {
+            calendarRef.current.getApi().gotoDate(eventDate)
+            
+            // Reset the flag after navigation
+            setTimeout(() => {
+              setIsUserNavigating(false)
+            }, 100)
+          }
+        }}
       />
 
       {/* Bug Report Modal */}
