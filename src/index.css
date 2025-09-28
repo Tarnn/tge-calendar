@@ -23,6 +23,79 @@
     width: 100%;
     min-height: 100vh;
   }
+
+  /* Custom Bitcoin Orange Scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #f7931a;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #e8851a;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: #d67a1a;
+  }
+
+  /* Firefox scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #f7931a rgba(0, 0, 0, 0.1);
+  }
+
+  /* Dark mode scrollbar adjustments */
+  [data-theme="dark"] ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  [data-theme="dark"] * {
+    scrollbar-color: #f7931a rgba(255, 255, 255, 0.1);
+  }
+
+  /* Mobile responsive navbar styles */
+  @media (max-width: 768px) {
+    .desktop-search {
+      display: none !important;
+    }
+    
+    .desktop-nav {
+      display: none !important;
+    }
+    
+    .mobile-hamburger {
+      display: flex !important;
+    }
+  }
+  
+  @media (min-width: 769px) {
+    .desktop-search {
+      display: block !important;
+    }
+    
+    .desktop-nav {
+      display: flex !important;
+    }
+    
+    .mobile-hamburger {
+      display: none !important;
+    }
+    
+    .mobile-menu {
+      display: none !important;
+    }
+  }
 }
 
 /* Floating animation for coins */

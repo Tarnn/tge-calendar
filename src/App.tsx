@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import type { EventInput, EventClickArg } from '@fullcalendar/core'
+import type { EventInput, EventClickArg, DatesSetArg } from '@fullcalendar/core'
+import { useTgeEvents } from './hooks/useTgeEvents'
+import type { TgeEvent } from './types/events'
 
 // Crypto token icons (SVG components)
 const BitcoinIcon = ({ size }: { size: number }) => (
@@ -20,15 +22,6 @@ const EthereumIcon = ({ size }: { size: number }) => (
     <path d="M12 3L6.5 12L12 9.5V3Z" fill="white"/>
     <path d="M12 16.5L12 21L17.5 13L12 16.5Z" fill="white" opacity="0.6"/>
     <path d="M12 21V16.5L6.5 13L12 21Z" fill="white"/>
-  </svg>
-)
-
-const SolanaIcon = ({ size }: { size: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="12" fill="#14F195"/>
-    <path d="M6.5 15.5L8 14H17.5C17.8 14 18 14.2 18 14.5S17.8 15 17.5 15H6.5Z" fill="white"/>
-    <path d="M6.5 9.5L8 8H17.5C17.8 8 18 8.2 18 8.5S17.8 9 17.5 9H6.5Z" fill="white"/>
-    <path d="M17.5 11.5L16 13H6.5C6.2 13 6 12.8 6 12.5S6.2 12 6.5 12H17.5Z" fill="white"/>
   </svg>
 )
 
@@ -67,6 +60,20 @@ const AaveIcon = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="12" fill="#B6509E"/>
     <path d="M12 6L16 18H14L13 15H11L10 18H8L12 6ZM12 9L11.5 12H12.5L12 9Z" fill="white"/>
+  </svg>
+)
+
+const SolanaIcon = ({ size }: { size: number }) => (
+  <svg width={size} height={size} viewBox="0 0 397.7 311.7" fill="none">
+    <defs>
+      <linearGradient id={`solanaGradient-${size}`} x1="360.879" y1="351.455" x2="141.213" y2="131.789" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#00FFA3"/>
+        <stop offset="1" stopColor="#DC1FFF"/>
+      </linearGradient>
+    </defs>
+    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 237.9z" fill={`url(#solanaGradient-${size})`}/>
+    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill={`url(#solanaGradient-${size})`}/>
+    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill={`url(#solanaGradient-${size})`}/>
   </svg>
 )
 
@@ -216,55 +223,675 @@ const BackgroundCryptos = () => {
   )
 }
 
-// Sample TGE events
-const tgeEvents: EventInput[] = [
-  {
-    id: '1',
-    title: 'Solana DeFi Launch',
-    start: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    backgroundColor: '#ec4899',
-    borderColor: '#ec4899',
-  },
-  {
-    id: '2',
-    title: 'Gaming Token TGE',
-    start: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    backgroundColor: '#8b5cf6',
-    borderColor: '#8b5cf6',
-  },
-  {
-    id: '3',
-    title: 'Bridge Protocol',
-    start: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    backgroundColor: '#06b6d4',
-    borderColor: '#06b6d4',
-  },
-  {
-    id: '4',
-    title: 'AI Trading Platform',
-    start: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+// Typewriter animation component with colored TGEs and glow
+const TypewriterText = () => {
+  const [displayedText, setDisplayedText] = React.useState('')
+  const [currentIndex, setCurrentIndex] = React.useState(0)
+  const [showCursor, setShowCursor] = React.useState(true)
+  const fullText = "Track TGEs anytime, anywhere."
+  
+  React.useEffect(() => {
+    if (currentIndex < fullText.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(fullText.slice(0, currentIndex + 1))
+        setCurrentIndex(currentIndex + 1)
+      }, 100)
+      return () => clearTimeout(timeout)
+    } else {
+      // Hide cursor after typing is complete
+      const timeout = setTimeout(() => {
+        setShowCursor(false)
+      }, 2000)
+      return () => clearTimeout(timeout)
+    }
+  }, [currentIndex, fullText])
+
+  // Split text to highlight "TGEs"
+  const renderText = () => {
+    const text = displayedText
+    const tgeIndex = text.indexOf('TGEs')
+    
+    if (tgeIndex === -1) {
+      return <span>{text}</span>
+    }
+    
+    const beforeTGE = text.slice(0, tgeIndex)
+    const tgeText = text.slice(tgeIndex, tgeIndex + 4)
+    const afterTGE = text.slice(tgeIndex + 4)
+    
+    return (
+      <>
+        <span>{beforeTGE}</span>
+        <span style={{ 
+          color: '#f7931a',
+          textShadow: '0 0 20px rgba(247, 147, 26, 0.5), 0 0 40px rgba(247, 147, 26, 0.3)',
+          filter: 'drop-shadow(0 0 10px rgba(247, 147, 26, 0.4))'
+        }}>
+          {tgeText}
+        </span>
+        <span>{afterTGE}</span>
+      </>
+    )
   }
-]
+
+  return (
+    <motion.h1 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, delay: 0.2 }}
+      style={{
+        fontSize: 'clamp(3rem, 8vw, 6rem)',
+        fontWeight: 'bold',
+        color: 'white',
+        marginBottom: '24px',
+        lineHeight: '1.1',
+        letterSpacing: '-0.02em',
+        minHeight: '1.2em'
+      }}
+    >
+      {renderText()}
+      {showCursor && (
+        <motion.span
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 1, repeat: Infinity }}
+          style={{ color: '#ec4899' }}
+        >
+          |
+        </motion.span>
+      )}
+    </motion.h1>
+  )
+}
+
+// Animated Counter Component
+const AnimatedCounter = ({ end, duration = 2000, suffix = '', prefix = '' }: { 
+  end: number, 
+  duration?: number, 
+  suffix?: string, 
+  prefix?: string 
+}) => {
+  const [count, setCount] = React.useState(0)
+  const [hasStarted, setHasStarted] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!hasStarted) return
+
+    let startTime: number
+    const startCount = 0
+
+    const updateCount = (timestamp: number) => {
+      if (!startTime) startTime = timestamp
+      const progress = Math.min((timestamp - startTime) / duration, 1)
+      
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4)
+      const currentCount = Math.floor(easeOutQuart * (end - startCount) + startCount)
+      
+      setCount(currentCount)
+      
+      if (progress < 1) {
+        requestAnimationFrame(updateCount)
+      } else {
+        setCount(end)
+      }
+    }
+
+    requestAnimationFrame(updateCount)
+  }, [end, duration, hasStarted])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      onViewportEnter={() => setHasStarted(true)}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+    >
+      <span style={{ color: '#f7931a', fontSize: 'inherit', fontWeight: 'inherit' }}>
+        {prefix}{count}{suffix}
+      </span>
+    </motion.div>
+  )
+}
+
+// Stats Section Component
+const StatsSection = ({ theme }: { theme: string }) => {
+  const stats = [
+    { number: 500, suffix: '+', label: 'Live Events' },
+    { number: 50, suffix: '+', label: 'Blockchains' },
+    { number: 24, suffix: '/7', label: 'Monitoring' }
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, delay: 5.0 }}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '32px',
+        maxWidth: '600px',
+        margin: '48px auto 0',
+        padding: '0 24px'
+      }}
+    >
+      {stats.map((stat, index) => (
+        <motion.div
+          key={stat.label}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 5.2 + (index * 0.2) }}
+          style={{
+            textAlign: 'center',
+            padding: '24px 16px',
+            background: theme === 'dark' 
+              ? 'rgba(17, 24, 39, 0.8)' 
+              : 'rgba(255, 255, 255, 0.9)',
+            borderRadius: '16px',
+            border: theme === 'dark' 
+              ? '1px solid rgba(75, 85, 99, 0.3)'
+              : '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: theme === 'dark'
+              ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+              : '0 8px 32px rgba(0, 0, 0, 0.1)'
+          }}
+          whileHover={{ 
+            scale: 1.05, 
+            y: -4,
+            transition: { duration: 0.2 }
+          }}
+        >
+          <div style={{
+            fontSize: 'clamp(2rem, 4vw, 3rem)',
+            fontWeight: 'bold',
+            marginBottom: '8px',
+            color: theme === 'dark' ? 'white' : '#1f2937'
+          }}>
+            <AnimatedCounter 
+              end={stat.number} 
+              suffix={stat.suffix}
+              duration={2000}
+            />
+          </div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            color: theme === 'dark' ? '#d1d5db' : '#6b7280',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            {stat.label}
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  )
+}
+
+// FAQ Page Component
+const FAQPage = ({ theme, onBack }: { theme: string, onBack: () => void }) => {
+  const [openFAQ, setOpenFAQ] = React.useState<string | null>('crypto-accept')
+
+  const faqs = [
+    {
+      id: 'crypto-accept',
+      question: 'Which cryptocurrencies do you track?',
+      answer: 'We track Token Generation Events (TGEs) across all major blockchains including Ethereum, Solana, Polygon, Binance Smart Chain, Avalanche, and many more. Our data comes from verified sources and includes both mainnet and testnet launches.'
+    },
+    {
+      id: 'how-track',
+      question: 'How do you track TGE events?',
+      answer: 'We aggregate data from multiple sources including project announcements, blockchain explorers, and verified community submissions. Our API updates in real-time to ensure you never miss important token launches.'
+    },
+    {
+      id: 'anonymous-use',
+      question: 'Can I use the calendar anonymously?',
+      answer: 'Yes! Our TGE Calendar is completely free to use and requires no registration. Simply visit the site to view all upcoming token generation events across supported blockchains.'
+    },
+    {
+      id: 'notifications',
+      question: 'How do I get notifications for TGE events?',
+      answer: 'Currently, notifications are not available, but this feature is on our roadmap. You can bookmark events of interest and check back regularly for updates.'
+    },
+    {
+      id: 'data-sources',
+      question: 'Where does your data come from?',
+      answer: 'We source our TGE data from CoinMarketCal API, project official announcements, blockchain explorers, and verified community submissions. All events are cross-referenced for accuracy.'
+    },
+    {
+      id: 'accuracy',
+      question: 'How accurate is the TGE information?',
+      answer: 'We strive for maximum accuracy by using multiple data sources and verification methods. However, TGE dates can change due to technical issues or project decisions. Always verify with official project channels.'
+    },
+    {
+      id: 'add-event',
+      question: 'Can I submit a TGE event?',
+      answer: 'Event submissions are currently handled through our data partners. If you notice missing or incorrect information, please use the "Report a Bug" feature to let us know.'
+    },
+    {
+      id: 'mobile-app',
+      question: 'Is there a mobile app?',
+      answer: 'Currently, we offer a responsive web application that works great on mobile devices. A dedicated mobile app may be considered for future development.'
+    },
+    {
+      id: 'api-access',
+      question: 'Do you provide API access?',
+      answer: 'API access is not currently available for public use. We use third-party APIs to aggregate TGE data. Contact us if you have specific integration needs.'
+    },
+    {
+      id: 'data-secure',
+      question: 'Is my data secure?',
+      answer: 'We prioritize user privacy and security. We don\'t collect personal information for basic calendar usage. Any data you provide (like bug reports) is handled securely and used only for improving our service.'
+    }
+  ]
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: theme === 'dark' 
+        ? 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)'
+        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '80px 24px 24px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Floating background crypto icons */}
+      <BackgroundCryptos />
+      <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative', zIndex: 10 }}>
+        <motion.button
+          onClick={onBack}
+          whileHover={{ scale: 1.02, x: -2 }}
+          whileTap={{ scale: 0.98 }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            marginBottom: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          ← Back to Calendar
+        </motion.button>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            background: theme === 'dark' ? 'rgba(17, 24, 39, 0.95)' : 'white',
+            borderRadius: '24px',
+            padding: '32px',
+            boxShadow: theme === 'dark' 
+              ? '0 20px 40px rgba(0, 0, 0, 0.3)'
+              : '0 20px 40px rgba(0, 0, 0, 0.1)',
+            border: theme === 'dark' 
+              ? '1px solid rgba(75, 85, 99, 0.3)'
+              : '1px solid rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <h1 style={{
+            fontSize: '32px',
+            fontWeight: 'bold',
+            color: theme === 'dark' ? 'white' : '#1f2937',
+            marginBottom: '32px',
+            margin: 0
+          }}>
+            FAQ
+          </h1>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {faqs.map((faq, index) => (
+              <motion.div
+                key={faq.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                style={{
+                  border: theme === 'dark' 
+                    ? '1px solid rgba(75, 85, 99, 0.3)'
+                    : '1px solid #e5e7eb',
+                  borderRadius: '16px',
+                  overflow: 'hidden'
+                }}
+              >
+                <motion.button
+                  onClick={() => setOpenFAQ(openFAQ === faq.id ? null : faq.id)}
+                  whileHover={{ backgroundColor: theme === 'dark' ? 'rgba(75, 85, 99, 0.1)' : '#f9fafb' }}
+                  style={{
+                    width: '100%',
+                    padding: '20px 24px',
+                    border: 'none',
+                    background: 'transparent',
+                    textAlign: 'left',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? 'white' : '#1f2937',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  {faq.question}
+                  <motion.div
+                    animate={{ rotate: openFAQ === faq.id ? 45 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: theme === 'dark' ? '#4b5563' : '#1f2937',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    +
+                  </motion.div>
+                </motion.button>
+                
+                <AnimatePresence>
+                  {openFAQ === faq.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div style={{
+                        padding: '0 24px 24px',
+                        color: theme === 'dark' ? '#d1d5db' : '#6b7280',
+                        lineHeight: '1.6',
+                        fontSize: '14px'
+                      }}>
+                        {faq.answer}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Contact Us Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            style={{
+              marginTop: '48px',
+              textAlign: 'center',
+              padding: '32px',
+              background: theme === 'dark' 
+                ? 'rgba(75, 85, 99, 0.1)'
+                : 'rgba(248, 250, 252, 0.8)',
+              borderRadius: '16px',
+              border: theme === 'dark' 
+                ? '1px solid rgba(75, 85, 99, 0.3)'
+                : '1px solid rgba(226, 232, 240, 0.8)'
+            }}
+          >
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
+              color: theme === 'dark' ? 'white' : '#1f2937',
+              marginBottom: '16px'
+            }}>
+              Still have questions?
+            </h3>
+            <p style={{
+              color: theme === 'dark' ? '#d1d5db' : '#6b7280',
+              marginBottom: '24px',
+              fontSize: '14px'
+            }}>
+              Can't find the answer you're looking for? Send us an email and we'll get back to you.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={async (e) => {
+                // Import email service dynamically
+                const { EmailService, SpamPrevention } = await import('./services/emailService')
+                
+                // Check spam prevention
+                const spamCheck = SpamPrevention.canSubmit()
+                if (!spamCheck.allowed) {
+                  alert(`Please wait ${spamCheck.remainingTime} more minute(s) before sending another message.`)
+                  return
+                }
+                
+                // Prompt for user input
+                const message = prompt('Please describe your question or feedback:')
+                if (!message || !message.trim()) {
+                  alert('Please provide a message.')
+                  return
+                }
+                
+                const name = prompt('Your name (optional):') || ''
+                const email = prompt('Your email (optional):') || ''
+                
+                // Show loading state
+                const button = e.target as HTMLButtonElement
+                const originalText = button.textContent
+                button.textContent = 'Sending...'
+                button.disabled = true
+                
+                try {
+                  // Send email
+                  const result = await EmailService.sendFAQContact({
+                    name,
+                    email,
+                    message: message.trim(),
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href
+                  })
+                  
+                  if (result.success) {
+                    // Record submission for spam prevention
+                    SpamPrevention.recordSubmission()
+                    alert(result.message)
+                  } else {
+                    alert(result.message)
+                  }
+                } catch (error) {
+                  console.error('Error sending FAQ contact:', error)
+                  alert('Failed to send message. Please try again later.')
+                } finally {
+                  // Reset button state
+                  button.textContent = originalText
+                  button.disabled = false
+                }
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                color: 'white',
+                fontWeight: '600',
+                fontSize: '14px',
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: '0 auto'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+              Contact Us
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+// Next TGE Banner Component
+const NextTGEBanner = ({ theme }: { theme: string }) => {
+  const { events: tgeEvents } = useTgeEvents(new Date())
+  
+  // Find the next upcoming TGE
+  const getNextTGE = () => {
+    if (!tgeEvents || tgeEvents.length === 0) return null
+    
+    const now = new Date()
+    const upcomingEvents = tgeEvents
+      .filter(event => new Date(event.startDate) > now)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    
+    return upcomingEvents[0] || null
+  }
+
+  const nextTGE = getNextTGE()
+
+  if (!nextTGE) return null
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 50%, #7c2d12 100%)',
+        color: 'white',
+        padding: '12px 24px',
+        textAlign: 'center',
+        fontSize: '14px',
+        fontWeight: '500',
+        zIndex: 1001,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)'
+      }}
+    >
+      <motion.div
+        animate={{ scale: [1, 1.02, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+      >
+        <span style={{ color: '#fbbf24' }}>🚀</span>
+        <span>
+          <strong style={{ color: '#f7931a' }}>{nextTGE.name}</strong> is the next upcoming TGE on{' '}
+          <strong>{formatDate(nextTGE.startDate)}</strong>
+        </span>
+        <span style={{ color: '#fbbf24' }}>🚀</span>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// Convert TGE events to FullCalendar format
+const convertToCalendarEvents = (tgeEvents: TgeEvent[]): EventInput[] => {
+  const colors = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+  
+  return tgeEvents.map((event, index) => ({
+    id: event.id,
+    title: event.symbol ? `${event.symbol} - ${event.name}` : event.name,
+    start: event.startDate,
+    end: event.endDate,
+    backgroundColor: colors[index % colors.length],
+    borderColor: colors[index % colors.length],
+    textColor: 'white',
+    extendedProps: {
+      description: event.description,
+      blockchain: event.blockchain,
+      symbol: event.symbol,
+      credibility: event.credibility,
+      announcementUrl: event.announcementUrl,
+      markets: event.markets
+    }
+  }))
+}
 
 function App(): JSX.Element {
-  const [selectedEvent, setSelectedEvent] = React.useState<any>(null)
+  const [selectedEvent, setSelectedEvent] = React.useState<TgeEvent | null>(null)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState('')
-  const [theme, setTheme] = React.useState('light')
+  const [theme, setTheme] = React.useState(() => {
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
   const [language, setLanguage] = React.useState('en')
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = React.useState(false)
   const [isThemeDropdownOpen, setIsThemeDropdownOpen] = React.useState(false)
+  const [isBugReportOpen, setIsBugReportOpen] = React.useState(false)
+  const [currentPage, setCurrentPage] = React.useState<'home' | 'faq'>('home')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
+  const [currentDate, setCurrentDate] = React.useState(new Date())
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
+  // Fetch TGE events for current month
+  const { events: tgeEvents, isLoading, error, refetch } = useTgeEvents(currentDate)
+
+  // Handle theme change
+  const handleThemeChange = (newTheme: string): void => {
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    setIsThemeDropdownOpen(false)
+  }
+
+  // Apply theme to document
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
   const handleEventClick = (clickInfo: EventClickArg): void => {
+    const extendedProps = clickInfo.event.extendedProps
     setSelectedEvent({
-      title: clickInfo.event.title,
-      date: clickInfo.event.start?.toLocaleDateString(),
-      id: clickInfo.event.id
+      id: clickInfo.event.id,
+      name: clickInfo.event.title,
+      description: extendedProps.description || '',
+      startDate: clickInfo.event.start?.toISOString() || '',
+      blockchain: extendedProps.blockchain,
+      symbol: extendedProps.symbol,
+      credibility: extendedProps.credibility,
+      announcementUrl: extendedProps.announcementUrl,
+      markets: extendedProps.markets || []
     })
   }
+
+  const handleDatesSet = (dateInfo: DatesSetArg): void => {
+    // Update current date when user navigates to different month
+    setCurrentDate(dateInfo.start)
+  }
+
+  // Convert TGE events to calendar events
+  const calendarEvents = React.useMemo(() => 
+    convertToCalendarEvents(tgeEvents), 
+    [tgeEvents]
+  )
 
   // Keyboard shortcut for search
   React.useEffect(() => {
@@ -290,13 +917,14 @@ function App(): JSX.Element {
     }
   }, [isSearchOpen])
 
-  // Close dropdowns when clicking outside
+  // Close dropdowns and mobile menu when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (!target.closest('[data-dropdown]')) {
+      if (!target.closest('[data-dropdown]') && !target.closest('[data-mobile-menu]')) {
         setIsLanguageDropdownOpen(false)
         setIsThemeDropdownOpen(false)
+        setIsMobileMenuOpen(false)
       }
     }
     
@@ -319,38 +947,50 @@ function App(): JSX.Element {
   const currentLanguage = languages.find(lang => lang.code === language) || languages[0]
   const currentTheme = themes.find(t => t.value === theme) || themes[0]
 
+  // Render FAQ page if selected
+  if (currentPage === 'faq') {
+    return <FAQPage theme={theme} onBack={() => setCurrentPage('home')} />
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
       width: '100vw',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: theme === 'dark' 
+        ? 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)'
+        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       margin: 0,
       padding: 0,
-      overflow: 'hidden'
+      overflow: 'hidden',
+      transition: 'background 0.3s ease'
     }}>
+      {/* Next TGE Banner */}
+      <NextTGEBanner theme={theme} />
       {/* Floating background crypto icons */}
       <BackgroundCryptos />
       
-      {/* Header exactly like Uniswap */}
+      {/* Transparent Header like Uniswap */}
       <header style={{
         position: 'fixed',
-        top: 0,
+        top: '48px', // Adjusted for banner height
         left: 0,
         right: 0,
         zIndex: 50,
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(0, 0, 0, 0.05)'
+        background: 'transparent',
+        backdropFilter: 'blur(24px)',
+        borderBottom: 'none'
       }}>
         <div style={{
           maxWidth: '1200px',
           margin: '0 auto',
-          padding: '0 24px',
+          padding: '0 16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          height: '72px'
+          height: '72px',
+          gap: '16px',
+          position: 'relative'
         }}>
           {/* Animated Logo */}
           <motion.div 
@@ -370,19 +1010,16 @@ function App(): JSX.Element {
               transition={{ duration: 0.6 }}
               style={{ 
                 fontSize: '20px', 
-                fontWeight: 'bold', 
-                background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
+                fontWeight: 'bold'
               }}
             >
-              TGE Calendar
+              <span style={{ color: '#f7931a' }}>TGE</span>{' '}
+              <span style={{ color: 'white' }}>Calendar</span>
             </motion.span>
           </motion.div>
           
-          {/* Search bar like Uniswap */}
-          <div style={{
+          {/* Search bar like Uniswap - Desktop Only */}
+          <div className="desktop-search" style={{
             flex: 1,
             maxWidth: '400px',
             margin: '0 40px'
@@ -445,8 +1082,55 @@ function App(): JSX.Element {
             </div>
           </div>
 
-          {/* Right side dropdowns */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Hamburger Menu Button - Mobile Only */}
+          <motion.button
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsMobileMenuOpen(!isMobileMenuOpen)
+              setIsLanguageDropdownOpen(false)
+              setIsThemeDropdownOpen(false)
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            data-mobile-menu
+            style={{
+              display: window.innerWidth <= 768 ? 'flex' : 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
+              background: 'rgba(248, 250, 252, 0.9)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <motion.div
+              animate={{ rotate: isMobileMenuOpen ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {isMobileMenuOpen ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              )}
+            </motion.div>
+          </motion.button>
+
+          {/* Right side dropdowns - Desktop Only */}
+          <div style={{ 
+            display: window.innerWidth <= 768 ? 'none' : 'flex', 
+            alignItems: 'center', 
+            gap: '12px' 
+          }}>
             {/* Language Dropdown */}
             <div style={{ position: 'relative' }} data-dropdown="language">
               <motion.button 
@@ -599,10 +1283,7 @@ function App(): JSX.Element {
                       <motion.button
                         key={themeOption.value}
                         whileHover={{ backgroundColor: '#f8fafc' }}
-                        onClick={() => {
-                          setTheme(themeOption.value)
-                          setIsThemeDropdownOpen(false)
-                        }}
+                        onClick={() => handleThemeChange(themeOption.value)}
                         style={{
                           width: '100%',
                           padding: '12px 16px',
@@ -629,6 +1310,135 @@ function App(): JSX.Element {
         </div>
       </header>
 
+      {/* Mobile Menu - Slide down from top */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            data-mobile-menu
+            style={{
+              position: 'fixed',
+              top: '120px', // Adjusted for banner + header height
+              left: '16px',
+              right: '16px',
+              background: 'rgba(248, 250, 252, 0.95)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '16px',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+              zIndex: 1000,
+              padding: '24px',
+              display: window.innerWidth <= 768 ? 'block' : 'none'
+            }}
+          >
+            {/* Mobile Search */}
+            <div style={{ marginBottom: '24px' }}>
+              <div 
+                onClick={() => {
+                  setIsSearchOpen(true)
+                  setIsMobileMenuOpen(false)
+                }}
+                style={{
+                  width: '100%',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <span style={{ color: '#64748b', fontSize: '14px' }}>
+                  Search tokens and events...
+                </span>
+              </div>
+            </div>
+
+            {/* Mobile Language Selector */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Language
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {languages.map(lang => (
+                  <motion.button
+                    key={lang.code}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setLanguage(lang.code)
+                      setIsMobileMenuOpen(false)
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      background: language === lang.code ? '#ec4899' : 'white',
+                      color: language === lang.code ? 'white' : '#64748b',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.name}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile Theme Selector */}
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Theme
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {themes.map(themeOption => (
+                  <motion.button
+                    key={themeOption.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      handleThemeChange(themeOption.value)
+                      setIsMobileMenuOpen(false)
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      background: theme === themeOption.value ? '#ec4899' : 'white',
+                      color: theme === themeOption.value ? 'white' : '#64748b',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>{themeOption.icon}</span>
+                    <span>{themeOption.name}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main content */}
       <main style={{
         display: 'flex',
@@ -637,41 +1447,25 @@ function App(): JSX.Element {
         justifyContent: 'center',
         minHeight: '100vh',
         padding: '0 16px',
-        paddingTop: '72px',
+        paddingTop: '120px', // Adjusted for banner + header height
         position: 'relative',
         zIndex: 10
       }}>
-        {/* Hero section with animations */}
+        {/* Hero section with typewriter animation */}
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           style={{ textAlign: 'center', marginBottom: '48px' }}
         >
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            style={{
-              fontSize: 'clamp(3rem, 8vw, 6rem)',
-              fontWeight: 'bold',
-              color: 'white',
-              marginBottom: '24px',
-              lineHeight: '1.1',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Track TGEs{' '}
-            <span style={{ display: 'block' }}>anytime,</span>
-            <span style={{ display: 'block' }}>anywhere.</span>
-          </motion.h1>
+          <TypewriterText />
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
+            transition={{ duration: 0.8, delay: 4.5 }}
             style={{
               fontSize: '20px',
-              color: 'rgba(255, 255, 255, 0.8)',
+              color: theme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.9)',
               maxWidth: '600px',
               margin: '0 auto',
               lineHeight: '1.6'
@@ -714,13 +1508,28 @@ function App(): JSX.Element {
                 }}>
                   Live TGE Calendar
                 </h2>
-                <p style={{
+                <div style={{
                   fontSize: '14px',
-                  color: '#6b7280',
+                  color: theme === 'dark' ? '#9ca3af' : '#6b7280',
                   marginTop: '8px'
                 }}>
-                  Press "/" to search for specific tokens and events
-                </p>
+                  {isLoading ? (
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        style={{ width: '12px', height: '12px' }}
+                      >
+                        ⏳
+                      </motion.div>
+                      Loading TGE events...
+                    </span>
+                  ) : error ? (
+                    `Using cached data`
+                  ) : (
+                    `${tgeEvents.length} events this month`
+                  )}
+                </div>
               </motion.div>
               
               <motion.div 
@@ -732,13 +1541,14 @@ function App(): JSX.Element {
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView='dayGridMonth'
-                  events={tgeEvents}
+                  events={calendarEvents}
                   eventClick={handleEventClick}
-                  height='700'
+                  datesSet={handleDatesSet}
+                  height={700}
                   headerToolbar={{
                     left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    right: 'dayGridMonth'
                   }}
                   eventDisplay='block'
                   dayMaxEvents={3}
@@ -747,11 +1557,36 @@ function App(): JSX.Element {
                   aspectRatio={1.8}
                   contentHeight='auto'
                   expandRows={true}
+                  eventDidMount={(info) => {
+                    try {
+                      // Add hover effects to events safely
+                      if (info.el) {
+                        info.el.style.transition = 'all 0.2s ease'
+                        const handleMouseEnter = () => {
+                          if (info.el) {
+                            info.el.style.transform = 'translateY(-2px) scale(1.02)'
+                            info.el.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.2)'
+                          }
+                        }
+                        const handleMouseLeave = () => {
+                          if (info.el) {
+                            info.el.style.transform = 'translateY(0) scale(1)'
+                            info.el.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'
+                          }
+                        }
+                        info.el.addEventListener('mouseenter', handleMouseEnter)
+                        info.el.addEventListener('mouseleave', handleMouseLeave)
+                      }
+                    } catch (error) {
+                      console.warn('FullCalendar eventDidMount error:', error)
+                    }
+                  }}
                 />
               </motion.div>
             </div>
           </div>
         </motion.div>
+
 
         {/* Animated Stats like donate.gg */}
         <motion.div 
@@ -795,39 +1630,186 @@ function App(): JSX.Element {
         </motion.div>
       </main>
 
-      {/* Footer */}
+      {/* Floating Bug Report Button */}
+      <motion.button
+        onClick={() => setIsBugReportOpen(true)}
+        whileHover={{ scale: 1.05, y: -2 }}
+        whileTap={{ scale: 0.95 }}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: theme === 'dark' ? '#374151' : '#4b5563',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50px',
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="m8 2 1.88 1.88"/>
+          <path d="M14.12 3.88 16 2"/>
+          <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/>
+          <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/>
+          <path d="M12 20v-9"/>
+          <path d="M6.53 9C4.6 8.8 3 7.1 3 5"/>
+          <path d="M6 13H2"/>
+          <path d="M3 21c0-2.1 1.7-3.9 3.8-4"/>
+          <path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/>
+          <path d="M22 13h-4"/>
+          <path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/>
+        </svg>
+        Report a Bug
+      </motion.button>
+
+      {/* Footer - donate.gg style */}
       <footer style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        padding: '16px 24px',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
+        position: 'relative',
+        marginTop: '80px',
+        background: 'white',
+        borderTop: '1px solid #e5e7eb',
+        padding: '40px 24px 24px',
+        zIndex: 40
       }}>
-        <a 
-          href="https://x.com/Tarn__K" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          style={{ 
-            color: 'rgba(255, 255, 255, 0.7)',
-            transition: 'color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-          </svg>
-          <span style={{ fontSize: '14px' }}>@Tarn__K</span>
-        </a>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '40px',
+          flexWrap: 'wrap'
+        }}>
+          {/* Left side - Logo, title, slogan, copyright */}
+          <div style={{ flex: 1, minWidth: '250px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <img 
+                src="/crypto-calendar.png" 
+                alt="TGE Calendar" 
+                style={{ width: '32px', height: '32px', borderRadius: '8px' }}
+              />
+              <span style={{ 
+                fontSize: '20px', 
+                fontWeight: 'bold'
+              }}>
+                <span style={{ color: '#f7931a' }}>TGE</span>{' '}
+                <span style={{ color: '#1f2937' }}>Calendar</span>
+              </span>
+            </div>
+            
+            <p style={{
+              fontSize: '16px',
+              color: '#6b7280',
+              marginBottom: '16px',
+              lineHeight: '1.5',
+              margin: '0 0 16px 0'
+            }}>
+              Track token generation events anytime, anywhere.
+            </p>
+            
+            <p style={{
+              fontSize: '12px',
+              color: '#9ca3af',
+              margin: 0
+            }}>
+              © 2025 TGE Calendar. All rights reserved.
+            </p>
+          </div>
+
+          {/* Right side - Donate, FAQ, and X links */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '24px',
+            flexShrink: 0
+          }}>
+            {/* Donate Section */}
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText('7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7')
+                  // Show success feedback
+                  const button = event?.target as HTMLButtonElement
+                  const originalText = button.textContent
+                  button.textContent = 'Copied!'
+                  button.style.background = '#22c55e'
+                  
+                  setTimeout(() => {
+                    button.textContent = originalText
+                    button.style.background = 'linear-gradient(135deg, #00FFA3, #DC1FFF)'
+                  }, 2000)
+                } catch (err) {
+                  console.error('Failed to copy address:', err)
+                  alert('Failed to copy address. Please copy manually: 7DAJDDn615WTaPQVkLvyoDyHZ5uCSeHgRS3yMsqborg7')
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #00FFA3, #DC1FFF)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px 16px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0, 255, 163, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <SolanaIcon size={18} />
+              Donate (Solana)
+            </motion.button>
+
+            <motion.button
+              onClick={() => setCurrentPage('faq')}
+              whileHover={{ scale: 1.05, y: -1 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#6b7280',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none'
+              }}
+            >
+              FAQ
+            </motion.button>
+            
+            <motion.a
+              href="https://x.com/Tarn__K"
+              target="_blank"
+              rel="noopener noreferrer"
+              whileHover={{ scale: 1.1, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                color: '#6b7280',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </motion.a>
+          </div>
+        </div>
       </footer>
 
       {/* Search Modal */}
@@ -978,10 +1960,25 @@ function App(): JSX.Element {
                   fontSize: '24px',
                   fontWeight: 'bold',
                   color: '#111827',
-                  marginBottom: '16px'
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}
               >
-                {selectedEvent.title}
+                {selectedEvent.name}
+                {selectedEvent.symbol && (
+                  <span style={{
+                    background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {selectedEvent.symbol}
+                  </span>
+                )}
               </motion.h3>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -990,14 +1987,62 @@ function App(): JSX.Element {
                 style={{ marginBottom: '24px' }}
               >
                 <p style={{ color: '#6b7280', marginBottom: '8px' }}>
-                  <strong>Date:</strong> {selectedEvent.date}
+                  <strong>Date:</strong> {new Date(selectedEvent.startDate).toLocaleDateString()}
                 </p>
-                <p style={{ color: '#6b7280', marginBottom: '8px' }}>
-                  <strong>Type:</strong> Token Generation Event
-                </p>
-                <p style={{ color: '#6b7280' }}>
-                  <strong>Status:</strong> Upcoming
-                </p>
+                {selectedEvent.blockchain && (
+                  <p style={{ color: '#6b7280', marginBottom: '8px' }}>
+                    <strong>Blockchain:</strong> {selectedEvent.blockchain}
+                  </p>
+                )}
+                {selectedEvent.credibility && (
+                  <p style={{ color: '#6b7280', marginBottom: '8px' }}>
+                    <strong>Credibility:</strong> 
+                    <span style={{
+                      marginLeft: '8px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      background: selectedEvent.credibility === 'verified' ? '#dcfce7' : '#fef3c7',
+                      color: selectedEvent.credibility === 'verified' ? '#166534' : '#92400e'
+                    }}>
+                      {selectedEvent.credibility}
+                    </span>
+                  </p>
+                )}
+                {selectedEvent.description && (
+                  <p style={{ color: '#6b7280', marginBottom: '12px', lineHeight: '1.5' }}>
+                    <strong>Description:</strong> {selectedEvent.description}
+                  </p>
+                )}
+                {selectedEvent.markets && selectedEvent.markets.length > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <p style={{ color: '#6b7280', marginBottom: '8px', fontWeight: 'bold' }}>
+                      Prediction Markets:
+                    </p>
+                    {selectedEvent.markets.map((market, index) => (
+                      <a
+                        key={index}
+                        href={market.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-block',
+                          margin: '4px 8px 4px 0',
+                          padding: '6px 12px',
+                          background: '#f0f9ff',
+                          color: '#0369a1',
+                          borderRadius: '8px',
+                          textDecoration: 'none',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          border: '1px solid #bae6fd'
+                        }}
+                      >
+                        {market.title}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </motion.div>
               <motion.button
                 initial={{ opacity: 0, y: 10 }}
@@ -1021,6 +2066,311 @@ function App(): JSX.Element {
               >
                 Close
               </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bug Report Modal */}
+      <AnimatePresence>
+        {isBugReportOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+              padding: '16px'
+            }}
+            onClick={() => setIsBugReportOpen(false)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: theme === 'dark' ? '#1f2937' : 'white',
+                borderRadius: '24px',
+                padding: '32px',
+                maxWidth: '500px',
+                width: '100%',
+                maxHeight: '80vh',
+                overflow: 'auto',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)'
+              }}
+            >
+              <motion.h2 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: theme === 'dark' ? 'white' : '#111827',
+                  marginBottom: '24px',
+                  margin: 0
+                }}
+              >
+                Report a Bug
+              </motion.h2>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                
+                // Import email service dynamically
+                const { EmailService, SpamPrevention } = await import('./services/emailService')
+                
+                // Check spam prevention
+                const spamCheck = SpamPrevention.canSubmit()
+                if (!spamCheck.allowed) {
+                  alert(`Please wait ${spamCheck.remainingTime} more minute(s) before submitting another report.`)
+                  return
+                }
+                
+                // Get form data
+                const formData = new FormData(e.target as HTMLFormElement)
+                const name = formData.get('name') as string || ''
+                const email = formData.get('email') as string || ''
+                const description = formData.get('description') as string || ''
+                
+                if (!description.trim()) {
+                  alert('Please provide a description of the bug.')
+                  return
+                }
+                
+                // Show loading state
+                const submitButton = e.target.querySelector('button[type="submit"]') as HTMLButtonElement
+                const originalText = submitButton.textContent
+                submitButton.textContent = 'Sending...'
+                submitButton.disabled = true
+                
+                try {
+                  // Send email
+                  const result = await EmailService.sendBugReport({
+                    name,
+                    email,
+                    description,
+                    userAgent: navigator.userAgent,
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href
+                  })
+                  
+                  if (result.success) {
+                    // Record submission for spam prevention
+                    SpamPrevention.recordSubmission()
+                    
+                    setIsBugReportOpen(false)
+                    alert(result.message)
+                    
+                    // Reset form
+                    ;(e.target as HTMLFormElement).reset()
+                  } else {
+                    alert(result.message)
+                  }
+                } catch (error) {
+                  console.error('Error submitting bug report:', error)
+                  alert('Failed to send bug report. Please try again later.')
+                } finally {
+                  // Reset button state
+                  submitButton.textContent = originalText
+                  submitButton.disabled = false
+                }
+              }}>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  style={{ marginBottom: '20px' }}
+                >
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#d1d5db' : '#374151',
+                    marginBottom: '8px'
+                  }}>
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Your Name"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: theme === 'dark' ? '#111827' : 'white',
+                      color: theme === 'dark' ? 'white' : '#111827',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#ec4899'}
+                    onBlur={(e) => e.target.style.borderColor = theme === 'dark' ? '#374151' : '#e5e7eb'}
+                  />
+                </motion.div>
+
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  style={{ marginBottom: '20px' }}
+                >
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#d1d5db' : '#374151',
+                    marginBottom: '8px'
+                  }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="your.email@example.org"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: theme === 'dark' ? '#111827' : 'white',
+                      color: theme === 'dark' ? 'white' : '#111827',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#ec4899'}
+                    onBlur={(e) => e.target.style.borderColor = theme === 'dark' ? '#374151' : '#e5e7eb'}
+                  />
+                </motion.div>
+
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  style={{ marginBottom: '20px' }}
+                >
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme === 'dark' ? '#d1d5db' : '#374151',
+                    marginBottom: '8px'
+                  }}>
+                    Description <span style={{ color: '#6b7280' }}>(required)</span>
+                  </label>
+                  <textarea
+                    required
+                    name="description"
+                    rows={6}
+                    placeholder="What's the bug? What did you expect?"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: theme === 'dark' ? '#111827' : 'white',
+                      color: theme === 'dark' ? 'white' : '#111827',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#ec4899'}
+                    onBlur={(e) => e.target.style.borderColor = theme === 'dark' ? '#374151' : '#e5e7eb'}
+                  />
+                </motion.div>
+
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    background: theme === 'dark' ? '#374151' : '#f9fafb',
+                    color: theme === 'dark' ? '#d1d5db' : '#374151',
+                    cursor: 'pointer',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect width="18" height="18" x="3" y="3" rx="2"/>
+                    <path d="M9 9h6v6H9z"/>
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-1.414-.586H13"/>
+                  </svg>
+                  Add a screenshot
+                </motion.button>
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <motion.button
+                    type="submit"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    style={{
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                      color: 'white',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      padding: '12px 24px',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Send Bug Report
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setIsBugReportOpen(false)}
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      color: theme === 'dark' ? '#d1d5db' : '#6b7280',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      padding: '12px 24px',
+                      border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </motion.button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
