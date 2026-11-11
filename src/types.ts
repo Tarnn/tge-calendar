@@ -58,10 +58,16 @@ export interface MarketSignal {
   /** "X listed on <venue> within 30 days of TGE?" — sorted by probability. */
   listings: ListingPoint[]
   links: SourceLink[]
-  /** First deadline the market prices at 50% or better. */
+  /** First deadline at 50% or better once contradictory quotes are smoothed out. */
   likelyBy?: OddsPoint
   /** Threshold at which the market is split 50/50, interpolated. */
   impliedFdvUsd?: number
+  /** Too little has traded for the prices to mean much. */
+  thin?: boolean
+  /** The quoted ladder contradicts itself (a later deadline priced below an earlier one). */
+  inconsistent?: boolean
+  /** Polymarket token whose price history charts the headline deadline. */
+  trend?: { token: string; date: string }
 }
 
 export interface TgeEvent {

@@ -1,15 +1,17 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react"
-import { animate, motion, useInView, useReducedMotion } from "framer-motion"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, animate, motion, useInView, useReducedMotion, useScroll, useTransform } from "framer-motion"
 import { ArrowRight, Radar } from "lucide-react"
 import type { TgeEvent } from "@/types"
 import type { ResolvedTheme } from "@/hooks/useTheme"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useNow } from "@/hooks/useNow"
 import { useI18n } from "@/i18n/context"
-import { countdownParts, countdownTarget, eventDaySpan } from "@/lib/dates"
-import { eventWhenLong, relativeDay } from "@/lib/eventText"
+import { countdownParts, countdownTarget, diffDays, eventDaySpan, localDayKey } from "@/lib/dates"
+import { eventWhenLong, eventWhenShort, relativeDay } from "@/lib/eventText"
 import { formatUsdCompact } from "@/lib/format"
 import { Avatar, StatusBadge, TypeBadge } from "@/components/EventBits"
+
+import type { Satellite } from "@/components/HeroScene"
 
 const HeroScene = lazy(() => import("@/components/HeroScene"))
 
@@ -43,11 +45,37 @@ function CountUp({ value, format }: { value: number; format: (n: number) => stri
   )
 }
 
+/** Two digits that roll upward when they change, like a departure board. */
+function RollingDigits({ value }: { value: number }) {
+  const text = String(value).padStart(2, "0")
+  return (
+    <span className="flex" aria-hidden>
+      {text.split("").map((char, index) => (
+        <span key={index} className="relative inline-block h-[1.2em] w-[0.62em] overflow-hidden">
+          <AnimatePresence initial={false}>
+            <motion.span
+              key={char}
+              initial={{ y: "85%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "-85%", opacity: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 text-center leading-[1.2]"
+            >
+              {char}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      ))}
+    </span>
+  )
+}
+
 function Digits({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex w-16 flex-col items-center rounded-xl border border-line bg-bg/60 py-2.5 sm:w-[4.5rem]">
       <span className="tabular font-mono text-2xl font-semibold text-ink sm:text-3xl">
-        {String(value).padStart(2, "0")}
+        <RollingDigits value={value} />
+        <span className="sr-only">{String(value).padStart(2, "0")}</span>
       </span>
       <span className="mt-0.5 text-[10px] font-medium tracking-wider text-ink-faint uppercase">{label}</span>
     </div>
@@ -152,6 +180,8 @@ export interface HeroProps {
   stats: HeroStats
   headline: TgeEvent | undefined
   following: TgeEvent[]
+  /** Upcoming dated launches shown as satellites around the coin, soonest first. */
+  orbit: TgeEvent[]
   onOpenEvent: (event: TgeEvent) => void
   onOpenCalendar: () => void
   onOpenRadar: () => void
@@ -181,9 +211,54 @@ function useSceneEnabled(): boolean {
   return wide && idle
 }
 
-export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCalendar, onOpenRadar }: HeroProps) {
-  const { t } = useI18n()
+const WORD = {
+  hidden: { opacity: 0, y: 18, filter: "blur(8px)" },
+  shown: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const } },
+}
+
+export function Hero({
+  theme,
+  stats,
+  headline,
+  following,
+  orbit,
+  onOpenEvent,
+  onOpenCalendar,
+  onOpenRadar,
+}: HeroProps) {
+  const i18n = useI18n()
+  const { t } = i18n
   const sceneEnabled = useSceneEnabled()
+  const reduced = useReducedMotion()
+  const now = useNow(60_000)
+
+  // The scene drifts down and fades as the page scrolls away from it.
+  const { scrollY } = useScroll()
+  const sceneY = useTransform(scrollY, [0, 700], [0, 110])
+  const sceneOpacity = useTransform(scrollY, [0, 620], [1, 0.15])
+
+  const satellites = useMemo<Satellite[]>(() => {
+    const today = localDayKey(now)
+    return orbit.map((event) => {
+      const start = eventDaySpan(event).start
+      return {
+        id: event.id,
+        tag: event.symbol ?? event.project.slice(0, 6),
+        title: event.project,
+        // A sale or claim window that has already opened is "underway", not "3 days ago".
+        detail: `${t(`type.${event.type}`)} · ${eventWhenShort(i18n, event)} · ${
+          start < today ? t("next.live") : relativeDay(i18n, start, now)
+        }`,
+        type: event.type,
+        days: diffDays(today, start),
+      }
+    })
+  }, [orbit, now, i18n, t])
+
+  const selectSatellite = (id: string): void => {
+    const event = orbit.find((candidate) => candidate.id === id)
+    if (event) onOpenEvent(event)
+  }
   const integer = (n: number): string => String(Math.round(n))
 
   const statItems = [
@@ -195,24 +270,27 @@ export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCal
 
   return (
     <section id="top" className="relative overflow-hidden">
-      {/* 3D backdrop on the right-hand side; smaller screens keep the lighter CSS glow. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-0 right-0 hidden h-[32rem] w-[54%] lg:block"
+      {/* 3D scene on the right-hand side; smaller screens keep the lighter CSS glow.
+          The wrapper ignores the pointer so only the satellite buttons inside catch it. */}
+      <motion.div
+        className="pointer-events-none absolute top-0 right-0 hidden h-[32rem] w-[56%] lg:block"
         style={{
-          maskImage: "radial-gradient(ellipse 62% 62% at 50% 46%, black 45%, transparent 100%)",
-          WebkitMaskImage: "radial-gradient(ellipse 62% 62% at 50% 46%, black 45%, transparent 100%)",
+          y: reduced ? 0 : sceneY,
+          opacity: reduced ? 1 : sceneOpacity,
+          maskImage: "radial-gradient(ellipse 78% 82% at 50% 48%, black 62%, transparent 100%)",
+          WebkitMaskImage: "radial-gradient(ellipse 78% 82% at 50% 48%, black 62%, transparent 100%)",
         }}
       >
         {sceneEnabled && (
           <Suspense fallback={null}>
-            <HeroScene theme={theme} />
+            <HeroScene theme={theme} satellites={satellites} onSelect={selectSatellite} label={t("hero.orbit")} />
           </Suspense>
         )}
-      </div>
+      </motion.div>
 
-      <div className="relative mx-auto max-w-7xl px-4 pt-10 pb-12 sm:px-6 sm:pt-14 lg:pt-16 lg:pb-14">
-        <div className="max-w-2xl lg:max-w-[54%]">
+      {/* Sits above the scene but lets the pointer through, so the satellites stay clickable. */}
+      <div className="pointer-events-none relative mx-auto max-w-7xl px-4 pt-10 pb-12 sm:px-6 sm:pt-14 lg:pt-16 lg:pb-14">
+        <div className="pointer-events-auto max-w-2xl lg:max-w-[52%]">
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -224,16 +302,27 @@ export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCal
           </motion.p>
 
           <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+            initial="hidden"
+            animate="shown"
+            variants={{ shown: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } } }}
             className="mt-5 font-display text-[2.6rem] leading-[1.04] font-semibold tracking-tight text-balance sm:text-6xl lg:text-[4.25rem]"
           >
-            {t("hero.titleA")}
+            {t("hero.titleA")
+              .split(" ")
+              .map((word, index) => (
+                <span key={index}>
+                  <motion.span variants={WORD} className="inline-block">
+                    {word}
+                  </motion.span>{" "}
+                </span>
+              ))}
             <br />
-            <span className="bg-gradient-to-r from-brand via-brand-ink to-brand bg-clip-text text-transparent">
+            <motion.span
+              variants={WORD}
+              className="inline-block bg-gradient-to-r from-brand via-brand-ink to-brand bg-clip-text text-transparent"
+            >
               {t("hero.titleB")}
-            </span>
+            </motion.span>
           </motion.h1>
 
           <motion.p
@@ -288,7 +377,7 @@ export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCal
           )}
         </div>
 
-        <div className="mt-10">
+        <div className="pointer-events-auto mt-10">
           <NextUp headline={headline} following={following} onOpen={onOpenEvent} />
         </div>
       </div>

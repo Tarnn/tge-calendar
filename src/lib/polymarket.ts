@@ -26,6 +26,7 @@ const marketSchema = z.object({
   closed: z.nullish(z.boolean()),
   active: z.nullish(z.boolean()),
   oneDayPriceChange: z.nullish(z.number()),
+  clobTokenIds: z.nullish(z.string()),
 })
 
 const eventSchema = z.object({
@@ -40,12 +41,54 @@ const eventSchema = z.object({
 export type GammaEvent = z.infer<typeof eventSchema>
 type GammaMarket = z.infer<typeof marketSchema>
 
-/** Join key: "Predict.fun" → "predictfun", "Meta Mask" → "metamask". */
+/**
+ * Polymarket names the same project differently across its markets ("Felix"
+ * for the FDV market, "Felix Protocol" for the launch market). Dropping a
+ * generic trailing word lets those land on one key.
+ */
+const GENERIC_SUFFIX = /\s+(protocol|finance|labs|network|foundation)$/i
+
+/** Join key: "Predict.fun" → "predictfun", "Felix Protocol" → "felix". */
 export function projectKey(name: string): string {
   return name
     .normalize("NFKD")
+    .trim()
+    .replace(GENERIC_SUFFIX, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
+}
+
+/** Below this much traded volume a market's prices are too easily moved to trust. */
+export const THIN_VOLUME_USD = 10_000
+
+/** A quote must stray this far from the consistent curve before the ladder is called inconsistent. */
+const INCONSISTENCY_TOLERANCE = 0.05
+
+/**
+ * Closest non-decreasing sequence to `values` (pool-adjacent-violators).
+ *
+ * "Launched by June" can never be more likely than "launched by December",
+ * yet thinly traded ladders are often quoted that way. Averaging each run of
+ * out-of-order quotes gives the consistent curve those quotes are noise around.
+ */
+export function isotonic(values: number[]): number[] {
+  const blocks: Array<{ sum: number; count: number }> = []
+  for (const value of values) {
+    blocks.push({ sum: value, count: 1 })
+    while (blocks.length > 1) {
+      const last = blocks[blocks.length - 1]
+      const previous = blocks[blocks.length - 2]
+      if (!last || !previous || previous.sum / previous.count <= last.sum / last.count) break
+      previous.sum += last.sum
+      previous.count += last.count
+      blocks.pop()
+    }
+  }
+  return blocks.flatMap((block) => Array.from({ length: block.count }, () => block.sum / block.count))
+}
+
+function strays(raw: number[], smooth: number[]): boolean {
+  return raw.some((value, index) => Math.abs(value - (smooth[index] ?? value)) > INCONSISTENCY_TOLERANCE)
 }
 
 type MarketKind = "launch" | "fdv" | "listing"
@@ -148,7 +191,10 @@ export function parseUsdThreshold(text: string | null | undefined): number | nul
  * the market doubts the token launches before the market expires.
  */
 export function impliedFdv(ladder: FdvPoint[]): number | undefined {
-  const points = [...ladder].sort((a, b) => a.thresholdUsd - b.thresholdUsd)
+  const sorted = [...ladder].sort((a, b) => a.thresholdUsd - b.thresholdUsd)
+  // "Above $1B" cannot be likelier than "above $500M": smooth to a non-increasing curve first.
+  const smooth = isotonic(sorted.map((point) => point.probability).reverse()).reverse()
+  const points = sorted.map((point, index) => ({ ...point, probability: smooth[index] ?? point.probability }))
   const first = points[0]
   if (!first || first.probability < 0.5) return undefined
   for (let i = 0; i < points.length - 1; i += 1) {
@@ -177,6 +223,8 @@ interface Draft {
   image?: string
   volumeUsd: number
   launch: Map<string, OddsPoint>
+  /** Yes-outcome token for each launch deadline, used to fetch its price history. */
+  tokens: Map<string, string>
   fdv: Map<number, FdvPoint>
   listings: Map<string, ListingPoint>
   links: Map<string, { label: string; url: string }>
@@ -203,12 +251,15 @@ export function buildSignals(events: GammaEvent[], today: string): MarketSignal[
       project: classified.project,
       volumeUsd: 0,
       launch: new Map(),
+      tokens: new Map(),
       fdv: new Map(),
       listings: new Map(),
       links: new Map(),
     }
     drafts.set(key, draft)
 
+    // The launch market carries the project's fuller name; prefer it for display.
+    if (classified.kind === "launch") draft.project = classified.project
     draft.image ??= event.image ?? event.icon ?? undefined
     draft.volumeUsd += Number.isFinite(event.volume) ? Number(event.volume) : 0
     draft.links.set(classified.kind, {
@@ -225,6 +276,8 @@ export function buildSignals(events: GammaEvent[], today: string): MarketSignal[
         const date = deadlineDay(market)
         if (!date || date < today) continue
         draft.launch.set(date, { date, probability, change1d: market.oneDayPriceChange ?? undefined })
+        const token = parseJsonArray(market.clobTokenIds)[0]
+        if (token) draft.tokens.set(date, token)
       } else if (classified.kind === "fdv") {
         const thresholdUsd = parseUsdThreshold(market.groupItemTitle) ?? parseUsdThreshold(market.question)
         if (thresholdUsd === null) continue
@@ -247,6 +300,19 @@ export function buildSignals(events: GammaEvent[], today: string): MarketSignal[
     const fdv = [...draft.fdv.values()].sort((a, b) => a.thresholdUsd - b.thresholdUsd)
     const listings = [...draft.listings.values()].sort((a, b) => b.probability - a.probability)
     if (launch.length === 0 && fdv.length === 0 && listings.length === 0) continue
+
+    const launchOdds = launch.map((point) => point.probability)
+    const launchCurve = isotonic(launchOdds)
+    const fdvOdds = fdv.map((point) => point.probability)
+    const fdvCurve = isotonic([...fdvOdds].reverse()).reverse()
+    // The first deadline at 50% or better on the consistent curve, not on a single stray quote.
+    const likelyIndex = launchCurve.findIndex((probability) => probability >= 0.5)
+    const likely = launch[likelyIndex]
+    const likelyBy = likely ? { ...likely, probability: launchCurve[likelyIndex] ?? likely.probability } : undefined
+    // The market worth charting: the likely deadline, else the nearest one.
+    const headline = likelyBy ?? launch[0]
+    const token = headline ? draft.tokens.get(headline.date) : undefined
+
     signals.push({
       key: draft.key,
       project: draft.project,
@@ -256,8 +322,11 @@ export function buildSignals(events: GammaEvent[], today: string): MarketSignal[
       fdv,
       listings,
       links: [...draft.links.values()],
-      likelyBy: launch.find((point) => point.probability >= 0.5),
+      likelyBy,
       impliedFdvUsd: impliedFdv(fdv),
+      thin: draft.volumeUsd < THIN_VOLUME_USD ? true : undefined,
+      inconsistent: strays(launchOdds, launchCurve) || strays(fdvOdds, fdvCurve) ? true : undefined,
+      trend: headline && token ? { token, date: headline.date } : undefined,
     })
   }
   return signals.sort((a, b) => b.volumeUsd - a.volumeUsd)

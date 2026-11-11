@@ -56,8 +56,8 @@ export function CommandPalette({ open, onOpenChange, events, suggested, onOpenEv
       label={t("nav.searchShort")}
       shouldFilter={false}
       loop
-      overlayClassName="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=open]:animate-fade"
-      contentClassName="fixed top-[12dvh] left-1/2 z-50 w-[min(38rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-line bg-surface shadow-card outline-none data-[state=open]:animate-pop"
+      overlayClassName="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade"
+      contentClassName="fixed top-[12dvh] left-1/2 z-50 w-[min(38rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-line bg-surface shadow-card outline-none data-[state=closed]:animate-fade-out data-[state=open]:animate-pop"
     >
       <div className="flex items-center gap-3 border-b border-line px-4">
         <Search aria-hidden className="size-4 shrink-0 text-ink-faint" />

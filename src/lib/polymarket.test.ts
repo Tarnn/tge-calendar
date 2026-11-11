@@ -4,6 +4,7 @@ import {
   classifyTitle,
   deadlineDay,
   impliedFdv,
+  isotonic,
   parseUsdThreshold,
   projectKey,
   yesProbability,
@@ -20,6 +21,7 @@ function market(overrides: Partial<NonNullable<GammaEvent["markets"]>[number]> =
     closed: false,
     active: true,
     oneDayPriceChange: null,
+    clobTokenIds: null,
     ...overrides,
   }
 }
@@ -29,6 +31,20 @@ describe("projectKey", () => {
     expect(projectKey("Predict.fun")).toBe("predictfun")
     expect(projectKey("Meta Mask")).toBe("metamask")
     expect(projectKey("fomo.family")).toBe("fomofamily")
+  })
+
+  it("drops a generic trailing word so differently named markets join up", () => {
+    expect(projectKey("Felix Protocol")).toBe(projectKey("Felix"))
+    expect(projectKey("Tori Finance")).toBe("tori")
+    expect(projectKey("Flop Labs")).toBe("flop")
+    expect(projectKey("Arch Network")).toBe("arch")
+  })
+
+  it("keeps words that distinguish one project from another", () => {
+    expect(projectKey("Robinhood Chain")).toBe("robinhoodchain")
+    expect(projectKey("Saturn Credit")).toBe("saturncredit")
+    // A project that is only the generic word keeps its name.
+    expect(projectKey("Protocol")).toBe("protocol")
   })
 })
 
@@ -49,6 +65,29 @@ describe("classifyTitle", () => {
     expect(classifyTitle("Will a Chinese company have a top ___ AI model by December 31?")).toBeNull()
     expect(classifyTitle("Kraken IPO closing market cap above ___ ?")).toBeNull()
     expect(classifyTitle("Will Tether launch a USD stablecoin in 2026?")).toBeNull()
+  })
+})
+
+describe("isotonic", () => {
+  it("leaves an already rising sequence alone", () => {
+    expect(isotonic([0.1, 0.4, 0.9])).toEqual([0.1, 0.4, 0.9])
+    expect(isotonic([])).toEqual([])
+  })
+
+  it("averages each run of out-of-order values", () => {
+    // Ostium on the day this was written: 59% by June, 46% by December.
+    const smooth = isotonic([0.13, 0.22, 0.59, 0.46])
+    expect(smooth[0]).toBe(0.13)
+    expect(smooth[1]).toBe(0.22)
+    expect(smooth[2]).toBeCloseTo(0.525, 10)
+    expect(smooth[3]).toBeCloseTo(0.525, 10)
+  })
+
+  it("never decreases and preserves the total", () => {
+    const raw = [0.28, 0.2, 0.19, 0.44, 0.57, 0.3, 0.31]
+    const smooth = isotonic(raw)
+    for (let i = 1; i < smooth.length; i += 1) expect(smooth[i]).toBeGreaterThanOrEqual(smooth[i - 1] as number)
+    expect(smooth.reduce((a, b) => a + b, 0)).toBeCloseTo(raw.reduce((a, b) => a + b, 0), 10)
   })
 })
 
@@ -126,6 +165,19 @@ describe("impliedFdv", () => {
     ])
     expect(value).toBeGreaterThan(150e6)
     expect(value).toBeLessThan(300e6)
+  })
+
+  it("smooths a ladder that prices a higher valuation as more likely", () => {
+    // "Above $800M" (68%) quoted over "above $500M" (65%): impossible as written.
+    const value = impliedFdv([
+      { thresholdUsd: 500e6, probability: 0.65 },
+      { thresholdUsd: 800e6, probability: 0.68 },
+      { thresholdUsd: 1e9, probability: 0.6 },
+      { thresholdUsd: 2e9, probability: 0.52 },
+      { thresholdUsd: 3e9, probability: 0.41 },
+    ])
+    expect(value).toBeGreaterThan(2e9)
+    expect(value).toBeLessThan(3e9)
   })
 
   it("is undefined when the market doubts even the lowest rung", () => {
@@ -243,3 +295,132 @@ describe("buildSignals", () => {
     expect(signals.map((signal) => signal.key)).toEqual(["predictfun", "metamask", "extended"])
   })
 })
+
+describe("buildSignals data quality", () => {
+  const TODAY = "2026-11-11"
+
+  it("merges markets that name one project two ways, keeping the launch market's name", () => {
+    const signals = buildSignals(
+      [
+        {
+          title: "Felix FDV above ___ one day after launch?",
+          slug: "felix-fdv",
+          volume: 90_000,
+          markets: [market({ groupItemTitle: "$100M", outcomePrices: '["0.6","0.4"]' })],
+        },
+        {
+          title: "Will Felix Protocol launch a token by ___?",
+          slug: "felix-launch",
+          volume: 20_000,
+          markets: [market({ groupItemTitle: "June 30, 2027", outcomePrices: '["0.51","0.49"]', endDate: "2027-07-01T04:00:00Z" })],
+        },
+      ],
+      TODAY,
+    )
+    expect(signals).toHaveLength(1)
+    expect(signals[0]).toMatchObject({ key: "felix", project: "Felix Protocol", volumeUsd: 110_000 })
+    expect(signals[0]?.launch).toHaveLength(1)
+    expect(signals[0]?.fdv).toHaveLength(1)
+  })
+
+  it("takes the likely date from the consistent curve and flags the contradiction", () => {
+    const [signal] = buildSignals(
+      [
+        {
+          title: "Will Perena launch a token by ___?",
+          slug: "perena",
+          volume: 260_000,
+          markets: [
+            market({ groupItemTitle: "December 31, 2026", outcomePrices: '["0.07","0.93"]', endDate: "2027-01-01T05:00:00Z" }),
+            market({ groupItemTitle: "March 31, 2027", outcomePrices: '["0.40","0.60"]', endDate: "2027-04-01T04:00:00Z" }),
+            market({ groupItemTitle: "June 30, 2027", outcomePrices: '["0.56","0.44"]', endDate: "2027-07-01T04:00:00Z" }),
+            market({ groupItemTitle: "December 31, 2027", outcomePrices: '["0.37","0.63"]', endDate: "2028-01-01T05:00:00Z" }),
+          ],
+        },
+      ],
+      TODAY,
+    )
+    // 56% by June cannot stand next to 37% by December: smoothed, neither reaches 50%.
+    expect(signal?.likelyBy).toBeUndefined()
+    expect(signal?.inconsistent).toBe(true)
+    // The quotes themselves are reported as traded.
+    expect(signal?.launch.map((point) => point.probability)).toEqual([0.07, 0.4, 0.56, 0.37])
+  })
+
+  it("reports the smoothed probability for the likely date", () => {
+    const [signal] = buildSignals(
+      [
+        {
+          title: "Will Ostium launch a token by ___ ?",
+          slug: "ostium",
+          volume: 590_000,
+          markets: [
+            market({ groupItemTitle: "March 31, 2027", outcomePrices: '["0.22","0.78"]', endDate: "2027-04-01T04:00:00Z" }),
+            market({ groupItemTitle: "June 30, 2027", outcomePrices: '["0.59","0.41"]', endDate: "2027-07-01T04:00:00Z" }),
+            market({ groupItemTitle: "December 31, 2027", outcomePrices: '["0.46","0.54"]', endDate: "2028-01-01T05:00:00Z" }),
+          ],
+        },
+      ],
+      TODAY,
+    )
+    expect(signal?.likelyBy?.date).toBe("2027-06-30")
+    expect(signal?.likelyBy?.probability).toBeCloseTo(0.525, 10)
+    expect(signal?.inconsistent).toBe(true)
+  })
+
+  it("does not flag small wobbles as inconsistent", () => {
+    const [signal] = buildSignals(
+      [
+        {
+          title: "Will Abstract launch a token by ___?",
+          slug: "abstract",
+          volume: 650_000,
+          markets: [
+            market({ groupItemTitle: "June 30, 2027", outcomePrices: '["0.0425","0.9575"]', endDate: "2027-07-01T04:00:00Z" }),
+            market({ groupItemTitle: "September 30, 2027", outcomePrices: '["0.0355","0.9645"]', endDate: "2027-10-01T04:00:00Z" }),
+          ],
+        },
+      ],
+      TODAY,
+    )
+    expect(signal?.inconsistent).toBeUndefined()
+  })
+
+  it("flags thin markets and exposes a token for the headline deadline", () => {
+    const signals = buildSignals(
+      [
+        {
+          title: "Will T-REX launch a token by ___?",
+          slug: "t-rex",
+          volume: 12,
+          markets: [
+            market({
+              groupItemTitle: "December 31, 2026",
+              outcomePrices: '["0.5","0.5"]',
+              endDate: "2027-01-01T05:00:00Z",
+              clobTokenIds: '["111", "222"]',
+            }),
+          ],
+        },
+        {
+          title: "Will Base launch a token by ___ ?",
+          slug: "base",
+          volume: 8_000_000,
+          markets: [
+            market({ groupItemTitle: "June 30, 2027", outcomePrices: '["0.16","0.84"]', endDate: "2027-07-01T04:00:00Z", clobTokenIds: '["333", "444"]' }),
+            market({ groupItemTitle: "December 31, 2027", outcomePrices: '["0.36","0.64"]', endDate: "2028-01-01T05:00:00Z", clobTokenIds: '["555", "666"]' }),
+          ],
+        },
+      ],
+      TODAY,
+    )
+    const trex = signals.find((signal) => signal.key === "trex")
+    const base = signals.find((signal) => signal.key === "base")
+    expect(trex?.thin).toBe(true)
+    expect(trex?.trend).toEqual({ token: "111", date: "2026-12-31" })
+    expect(base?.thin).toBeUndefined()
+    // No deadline reaches 50%, so the nearest one is the headline.
+    expect(base?.trend).toEqual({ token: "333", date: "2027-06-30" })
+  })
+})
+

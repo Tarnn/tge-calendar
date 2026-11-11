@@ -23,7 +23,8 @@ export function signalToEvent(signal: MarketSignal, today: string): TgeEvent {
     origin: "polymarket",
   } satisfies Partial<TgeEvent>
 
-  if (signal.likelyBy) {
+  // A thin market can be moved by a few dollars: its "likely" date stays off the calendar.
+  if (signal.likelyBy && !signal.thin) {
     return { ...base, precision: "deadline", date: signal.likelyBy.date, endDate: signal.likelyBy.date }
   }
   return { ...base, precision: "window", date: today, endDate: lastDeadline }
