@@ -1,158 +1,66 @@
-import emailjs from '@emailjs/browser'
-import { toast } from 'sonner'
+import { readJson, writeJson } from "@/lib/storage"
 
-// EmailJS configuration - set these up in EmailJS dashboard or environment variables
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_tge_calendar'
-const EMAILJS_TEMPLATE_ID_BUG = import.meta.env.VITE_EMAILJS_TEMPLATE_BUG || 'template_bug_report'
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'your_emailjs_public_key'
+/**
+ * Issue reports. When EmailJS credentials are present in the environment the
+ * report is emailed; otherwise the caller falls back to a pre-filled GitHub
+ * issue, so the form always leads somewhere real.
+ */
+const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID as string | undefined
+const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_BUG as string | undefined
+const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string | undefined
 
-// Initialize EmailJS only if we have a valid key
-if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== 'your_emailjs_public_key') {
-  emailjs.init(EMAILJS_PUBLIC_KEY)
-}
+export const REPO_URL = "https://github.com/Tarnn/tge-calendar"
 
-export interface BugReportData {
+const COOLDOWN_MS = 5 * 60_000
+const COOLDOWN_KEY = "tge:last-report"
+
+export interface IssueReport {
   name: string
   email: string
-  description: string
-  userAgent: string
-  timestamp: string
-  url: string
+  message: string
 }
 
-
-export class EmailService {
-  static async sendBugReport(data: BugReportData): Promise<{ success: boolean; message: string }> {
-    // Check if EmailJS is properly configured
-    if (EMAILJS_PUBLIC_KEY === 'your_emailjs_public_key' || !EMAILJS_PUBLIC_KEY) {
-      console.warn('EmailJS not configured, using fallback method')
-      toast.error('EmailJS not configured. Please check your EmailJS public key in .env.local', {
-        duration: 5000,
-        style: {
-          background: '#ef4444',
-          color: 'white',
-          border: '1px solid #dc2626'
-        }
-      })
-      return this.sendEmailFallback({
-        type: 'bug',
-        name: data.name,
-        email: data.email,
-        message: data.description
-      })
-    }
-
-    try {
-      const templateParams = {
-        to_email: 'tarnwallet@gmail.com',
-        from_name: data.name || 'Anonymous',
-        from_email: data.email || 'no-reply@tgecalendar.com',
-        subject: 'TGE Calendar - Bug Report',
-        message: data.description,
-        user_agent: data.userAgent,
-        timestamp: data.timestamp,
-        page_url: data.url,
-        report_type: 'Bug Report'
-      }
-
-      const response = await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID_BUG,
-        templateParams
-      )
-
-      if (response.status === 200) {
-        return { success: true, message: 'Bug report sent successfully!' }
-      } else {
-        throw new Error(`EmailJS returned status: ${response.status}`)
-      }
-    } catch (error) {
-      console.error('Error sending bug report:', error)
-      
-      // Try fallback method if EmailJS fails
-      console.log('Attempting fallback email method...')
-      return this.sendEmailFallback({
-        type: 'bug',
-        name: data.name,
-        email: data.email,
-        message: data.description
-      })
-    }
-  }
-
-
-  // Fallback method using a simple HTTP service (like Formspree or similar)
-  static async sendEmailFallback(data: {
-    type: 'bug'
-    name: string
-    email: string
-    message: string
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      // Using a generic form submission service as fallback
-      // You can replace this with Formspree, Netlify Forms, or similar
-      const formData = new FormData()
-      formData.append('_to', 'tarnwallet@gmail.com')
-      formData.append('_subject', 'TGE Calendar - Bug Report')
-      formData.append('name', data.name)
-      formData.append('email', data.email)
-      formData.append('message', data.message)
-      formData.append('timestamp', new Date().toISOString())
-      formData.append('url', window.location.href)
-
-      // This is a placeholder - you'll need to replace with actual service endpoint
-      const response = await fetch('https://formspree.io/f/your_form_id', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        return { success: true, message: 'Message sent successfully!' }
-      } else {
-        throw new Error(`HTTP ${response.status}`)
-      }
-    } catch (error) {
-      console.error('Fallback email service error:', error)
-      return { 
-        success: false, 
-        message: 'Failed to send message. Please try again later.' 
-      }
-    }
-  }
+export function isEmailConfigured(): boolean {
+  return Boolean(SERVICE_ID && TEMPLATE_ID && PUBLIC_KEY)
 }
 
-// Spam prevention utility
-export class SpamPrevention {
-  private static readonly COOLDOWN_PERIOD = 5 * 60 * 1000 // 5 minutes
-  private static readonly COOKIE_NAME = 'tge_last_submission'
+/** Minutes left before another report may be sent; 0 when sending is allowed. */
+export function cooldownMinutes(now: number = Date.now()): number {
+  const last = readJson<number>(COOLDOWN_KEY, 0)
+  const remaining = COOLDOWN_MS - (now - last)
+  return remaining > 0 ? Math.ceil(remaining / 60_000) : 0
+}
 
-  static canSubmit(): { allowed: boolean; remainingTime?: number } {
-    const lastSubmission = document.cookie
-      .split('; ')
-      .find(row => row.startsWith(`${this.COOKIE_NAME}=`))
-      ?.split('=')[1]
+export async function sendReport(report: IssueReport): Promise<void> {
+  if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) throw new Error("EmailJS is not configured")
+  // Loaded on demand: most visitors never open the form.
+  const { default: emailjs } = await import("@emailjs/browser")
+  const response = await emailjs.send(
+    SERVICE_ID,
+    TEMPLATE_ID,
+    {
+      from_name: report.name || "Anonymous",
+      from_email: report.email || "not provided",
+      subject: "TGE Calendar — issue report",
+      message: report.message,
+      user_agent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      page_url: window.location.href,
+      report_type: "Issue report",
+    },
+    { publicKey: PUBLIC_KEY },
+  )
+  if (response.status !== 200) throw new Error(`EmailJS returned ${response.status}`)
+  writeJson(COOLDOWN_KEY, Date.now())
+}
 
-    if (!lastSubmission) {
-      return { allowed: true }
-    }
-
-    const lastTime = parseInt(lastSubmission)
-    const now = Date.now()
-    const timeDiff = now - lastTime
-
-    if (timeDiff < this.COOLDOWN_PERIOD) {
-      const remainingTime = Math.ceil((this.COOLDOWN_PERIOD - timeDiff) / 60000)
-      return { allowed: false, remainingTime }
-    }
-
-    return { allowed: true }
-  }
-
-  static recordSubmission(): void {
-    const expires = new Date(Date.now() + this.COOLDOWN_PERIOD).toUTCString()
-    document.cookie = `${this.COOKIE_NAME}=${Date.now()}; expires=${expires}; path=/; SameSite=Strict`
-  }
+/** A new-issue link with the report already typed in. Contact details are left out: issues are public. */
+export function githubIssueUrl(report: Pick<IssueReport, "message">): string {
+  const firstLine = report.message.trim().split(/\r?\n/)[0] ?? ""
+  const title = firstLine.length > 70 ? `${firstLine.slice(0, 67)}…` : firstLine
+  const params = new URLSearchParams({
+    title: title || "Issue report",
+    body: `${report.message.trim()}\n\n---\nPage: ${window.location.href}`,
+  })
+  return `${REPO_URL}/issues/new?${params.toString()}`
 }

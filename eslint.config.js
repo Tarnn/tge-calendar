@@ -3,72 +3,38 @@ import globals from "globals"
 import reactHooks from "eslint-plugin-react-hooks"
 import reactRefresh from "eslint-plugin-react-refresh"
 import tseslint from "typescript-eslint"
-import { defineConfig, globalIgnores } from "eslint/config"
 
-export default defineConfig([
-  globalIgnores(["dist", "coverage"]),
+export default tseslint.config(
+  { ignores: ["dist", "coverage"] },
   {
     files: ["**/*.{ts,tsx}"],
-    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/__tests__/**"],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
-      reactHooks.configs["recommended-latest"],
+      reactHooks.configs.flat["recommended-latest"],
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      parserOptions: {
-        ecmaVersion: 2022,
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+      ecmaVersion: 2022,
       sourceType: "module",
-    },
-    plugins: {
-      "@typescript-eslint": tseslint.plugin,
+      globals: { ...globals.browser },
     },
     rules: {
-      "@typescript-eslint/explicit-function-return-type": [
-        "warn",
-        {
-          allowExpressions: true,
-          allowTypedFunctionExpressions: true,
-        },
-      ],
       "@typescript-eslint/consistent-type-imports": "error",
-      "no-console": [
-        "warn",
-        {
-          allow: ["warn", "error"],
-        },
-      ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}"],
     languageOptions: {
-      parserOptions: {
-        ecmaVersion: 2022,
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-        ...globals.jest,
-      },
-      sourceType: "module",
+      globals: { ...globals.browser, ...globals.node, ...globals.vitest },
     },
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
+      "react-refresh/only-export-components": "off",
     },
   },
-])
+  {
+    files: ["vite.config.ts", "eslint.config.js"],
+    languageOptions: { globals: { ...globals.node } },
+  },
+)

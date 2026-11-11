@@ -1,42 +1,117 @@
-export function Header(): JSX.Element {
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
+import { Check, Languages, Monitor, Moon, Search, Sun } from "lucide-react"
+import { LOCALES, useI18n } from "@/i18n/context"
+import type { ThemeChoice, ThemeState } from "@/hooks/useTheme"
+import type { ViewMode } from "@/types"
+import { cn } from "@/lib/cn"
+
+const THEME_ICON = { light: Sun, dark: Moon, system: Monitor } as const
+const THEME_CHOICES: readonly ThemeChoice[] = ["light", "dark", "system"]
+
+const menuContent =
+  "z-50 min-w-40 rounded-xl border border-line bg-surface p-1 shadow-card data-[state=open]:animate-pop"
+const menuItem =
+  "flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-ink-soft outline-none select-none data-[highlighted]:bg-raised data-[highlighted]:text-ink"
+const iconButton =
+  "grid size-9 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-ink/8 hover:text-ink"
+
+export interface HeaderProps {
+  theme: ThemeState
+  onOpenSearch: () => void
+  onNavigate: (target: ViewMode | "faq") => void
+}
+
+export function Header({ theme, onOpenSearch, onNavigate }: HeaderProps) {
+  const { t, locale, setLocale } = useI18n()
+  const ThemeIcon = THEME_ICON[theme.choice]
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo - white text on gradient background */}
-          <div className="flex items-center space-x-3">
-            <img 
-              src="/crypto-calendar.png" 
-              alt="TGE Calendar" 
-              className="w-8 h-8 rounded-lg"
-            />
-            <span className="text-xl font-bold text-white">
-              TGE Calendar
-            </span>
-          </div>
+    <header className="sticky top-0 z-40 border-b border-line bg-bg/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
+        <a href="#top" className="flex shrink-0 items-center gap-2.5 rounded-lg" aria-label={t("app.name")}>
+          <img src="/crypto-calendar.png" alt="" width={28} height={28} className="size-7 rounded-lg" />
+          <span className="font-display text-[17px] font-semibold tracking-tight">
+            <span className="text-brand-ink">TGE</span> Calendar
+          </span>
+        </a>
 
-          {/* Simple nav - white text */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-white/80 hover:text-white font-medium transition-colors">
-              Calendar
-            </a>
-            <a href="#" className="text-white/80 hover:text-white font-medium transition-colors">
-              Analytics
-            </a>
-          </nav>
+        <nav aria-label={t("app.name")} className="ml-2 hidden items-center gap-1 md:flex">
+          {(["month", "radar", "faq"] as const).map((target) => (
+            <button
+              key={target}
+              type="button"
+              onClick={() => onNavigate(target)}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:bg-ink/8 hover:text-ink"
+            >
+              {t(target === "month" ? "nav.calendar" : target === "radar" ? "nav.radar" : "nav.faq")}
+            </button>
+          ))}
+        </nav>
 
-          {/* X Profile - white */}
-          <a 
-            href="https://x.com/Tarn__K" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-white transition-colors"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          </a>
-        </div>
+        <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className="hidden h-9 w-64 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm text-ink-faint transition-colors hover:border-line-strong hover:text-ink-soft sm:flex lg:w-80"
+        >
+          <Search aria-hidden className="size-4 shrink-0" />
+          <span className="flex-1 truncate text-left">{t("nav.search")}</span>
+          <kbd className="rounded border border-line bg-raised px-1.5 font-mono text-[11px] text-ink-faint">/</kbd>
+        </button>
+        <button type="button" onClick={onOpenSearch} aria-label={t("nav.searchShort")} className={cn(iconButton, "sm:hidden")}>
+          <Search aria-hidden className="size-[18px]" />
+        </button>
+
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger aria-label={t("nav.language")} className={iconButton}>
+            <Languages aria-hidden className="size-[18px]" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content align="end" sideOffset={8} className={menuContent}>
+              <DropdownMenu.RadioGroup value={locale}>
+                {LOCALES.map((entry) => (
+                  <DropdownMenu.RadioItem
+                    key={entry.code}
+                    value={entry.code}
+                    onSelect={() => setLocale(entry.code)}
+                    className={menuItem}
+                  >
+                    <span className="flex-1">{entry.label}</span>
+                    {locale === entry.code && <Check aria-hidden className="size-4 text-brand-ink" />}
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger aria-label={t("nav.theme")} className={iconButton}>
+            <ThemeIcon aria-hidden className="size-[18px]" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content align="end" sideOffset={8} className={menuContent}>
+              <DropdownMenu.RadioGroup value={theme.choice}>
+                {THEME_CHOICES.map((choice) => {
+                  const Icon = THEME_ICON[choice]
+                  return (
+                    <DropdownMenu.RadioItem
+                      key={choice}
+                      value={choice}
+                      onSelect={() => theme.setChoice(choice)}
+                      className={menuItem}
+                    >
+                      <Icon aria-hidden className="size-4" />
+                      <span className="flex-1">{t(`theme.${choice}`)}</span>
+                      {theme.choice === choice && <Check aria-hidden className="size-4 text-brand-ink" />}
+                    </DropdownMenu.RadioItem>
+                  )
+                })}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </header>
   )
