@@ -6,10 +6,11 @@ import {
   CanvasTexture,
   Color,
   ColorManagement,
-  CylinderGeometry,
+  DoubleSide,
   Group,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
+  LatheGeometry,
   LinearSRGBColorSpace,
   Mesh,
   MeshBasicMaterial,
@@ -19,6 +20,7 @@ import {
   Points,
   Scene,
   ShaderMaterial,
+  Vector2,
   Vector3,
   Vector4,
   WebGLRenderer,
@@ -70,6 +72,8 @@ export interface Beacon {
   days: number
   /** The launch the hero counts down to. */
   lead: boolean
+  /** Extra words on the label, e.g. the time left for the lead launch. */
+  note?: string
 }
 
 export interface RunwayMark {
@@ -87,6 +91,21 @@ const CAMERA_HEIGHT = 3
 /** How far behind the "now" line the camera stands. */
 const CAMERA_BACK = 11
 const INTRO_SECONDS = 2.8
+/** Frames slower than this on average (about 24 a second) mean the device is struggling. */
+const SLOW_FRAME_MS = 42
+/** Slower than this and lowering the quality will not save it. */
+const HOPELESS_FRAME_MS = 110
+const LOWEST_QUALITY = 0.5
+/** Remembered for the visit, so a struggling device is not asked to try again on every page load. */
+const STILL_KEY = "tge:scene:still"
+
+function storedStill(): boolean {
+  try {
+    return window.sessionStorage.getItem(STILL_KEY) === "1"
+  } catch {
+    return false
+  }
+}
 const SPARKS_PER_BEAM = 16
 
 interface Palette {
@@ -97,9 +116,10 @@ interface Palette {
   glow: number
   additive: boolean
   sun: string
-  veilA: string
-  veilB: string
-  aurora: number
+  veil: string
+  haze: number
+  /** What a polished coin reflects: sky, horizon, ground and the glow between them. */
+  env: { sky: string; horizon: string; ground: string; glow: string }
   dust: string
   ink: string
   inkAlpha: number
@@ -108,8 +128,6 @@ interface Palette {
   /** Width of the soft light round a beam: generous in the dark, tight on a light page. */
   halo: number
   sky: number
-  /** Unlit share of a coin's face: higher reads as a solid disc on a light page. */
-  shade: number
 }
 
 const PALETTE: Record<ResolvedTheme, Palette> = {
@@ -120,9 +138,9 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     glow: 1,
     additive: true,
     sun: "#ff9a3d",
-    veilA: "#7c5cff",
-    veilB: "#2dd4bf",
-    aurora: 0.85,
+    veil: "#6f63ff",
+    haze: 0.2,
+    env: { sky: "#1c2140", horizon: "#5a4252", ground: "#06060a", glow: "#ffa04a" },
     dust: "#ffd9a8",
     ink: "#f3f3f5",
     inkAlpha: 0.55,
@@ -130,7 +148,6 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     beam: 1,
     halo: 1,
     sky: 1,
-    shade: 0.22,
   },
   light: {
     line: "#3d3829",
@@ -139,9 +156,9 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     glow: 0.7,
     additive: false,
     sun: "#ffb561",
-    veilA: "#f59e0b",
-    veilB: "#fb7185",
-    aurora: 0.3,
+    veil: "#f0a35e",
+    haze: 0.16,
+    env: { sky: "#f4f6ff", horizon: "#ffe6cf", ground: "#8a8274", glow: "#ffc27a" },
     dust: "#9a5a12",
     ink: "#17150f",
     inkAlpha: 0.5,
@@ -149,7 +166,6 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     beam: 0.9,
     halo: 0.4,
     sky: 0.7,
-    shade: 0.6,
   },
 }
 
@@ -314,6 +330,7 @@ export default function HeroScene({
       uAccent: { value: new Color() },
       uMouse: { value: new Vector3(0, 0, 0) },
       uCount: { value: 0 },
+      uLead: { value: -1 },
       uBeacon: { value: Array.from({ length: MAX_BEACONS }, () => new Vector4()) },
       uBeaconColor: { value: Array.from({ length: MAX_BEACONS }, () => new Color()) },
     }
@@ -338,14 +355,12 @@ export default function HeroScene({
     /** Share of the sky quad that hangs below the horizon, where the glow spills onto the ground. */
     const SKY_HORIZON = 0.22
     const skyUniforms = {
-      uTime: time,
       uOpacity: { value: 1 },
       uIntro: intro,
-      uAurora: { value: 0.5 },
+      uHaze: { value: 0.2 },
       uHorizon: { value: SKY_HORIZON },
       uSun: { value: new Color() },
-      uVeilA: { value: new Color() },
-      uVeilB: { value: new Color() },
+      uVeil: { value: new Color() },
     }
     const skyMaterial = new ShaderMaterial({
       uniforms: skyUniforms,
@@ -457,7 +472,23 @@ export default function HeroScene({
     beams.renderOrder = 3
     beams.frustumCulled = false
 
-    const coin = new CylinderGeometry(0.5, 0.5, 0.1, 36)
+    // A coin turned on a lathe: a recessed face inside a raised rim, with a
+    // bevelled edge, so that it catches the light the way struck metal does.
+    const coin = new LatheGeometry(
+      [
+        [0, -0.032],
+        [0.34, -0.032],
+        [0.372, -0.05],
+        [0.458, -0.05],
+        [0.5, -0.024],
+        [0.5, 0.024],
+        [0.458, 0.05],
+        [0.372, 0.05],
+        [0.34, 0.032],
+        [0, 0.032],
+      ].map(([radius, height]) => new Vector2(radius, height)),
+      56,
+    )
     coin.rotateX(Math.PI / 2)
     const tokenGeometry = new InstancedBufferGeometry()
     tokenGeometry.index = coin.index
@@ -476,21 +507,25 @@ export default function HeroScene({
       uCam: cameraPosition,
       uGain: gain,
       uOpacity: { value: 1 },
-      uShade: { value: 0.22 },
+      uEnvSky: { value: new Color() },
+      uEnvHorizon: { value: new Color() },
+      uEnvGround: { value: new Color() },
+      uEnvGlow: { value: new Color() },
     }
+    // The one solid in the scene: it sorts its own faces with the depth buffer.
     const tokenMaterial = new ShaderMaterial({
       uniforms: tokenUniforms,
       vertexShader: TOKEN_VERTEX,
       fragmentShader: TOKEN_FRAGMENT,
       transparent: true,
-      depthTest: false,
-      depthWrite: false,
+      side: DoubleSide,
     })
     const tokens = new Mesh(tokenGeometry, tokenMaterial)
     tokens.renderOrder = 4
     tokens.frustumCulled = false
 
     const sparkTotal = MAX_BEACONS * SPARKS_PER_BEAM
+    const sparkRandom = Float32Array.from({ length: sparkTotal * 4 }, () => Math.random())
     const sparkBase = new BufferAttribute(new Float32Array(sparkTotal * 3), 3)
     const sparkColor = new BufferAttribute(new Float32Array(sparkTotal * 3), 3)
     const sparkSeed = new BufferAttribute(new Float32Array(sparkTotal * 4), 4)
@@ -539,11 +574,16 @@ export default function HeroScene({
     let vanishY = 0
     let hovered = -1
     let elapsed = 0
-    let introTime = reducedMotion ? INTRO_SECONDS : 0
+    let introTime = reducedMotion || storedStill() ? INTRO_SECONDS : 0
     let last = performance.now()
     let frame = 0
     let visible = true
     let announced = false
+    /** Share of the usual pixel density being drawn; lowered when frames run slow. */
+    let quality = 1
+    /** True when the scene is a still picture: by preference, or because the device cannot animate it. */
+    let still = reducedMotion || storedStill()
+    const governor = { settleUntil: 0, total: 0, frames: 0 }
     const pointer = { x: 0, y: 0, inside: false }
     const drift = { x: 0, y: 0 }
     const gains = new Float32Array(MAX_BEACONS)
@@ -567,8 +607,6 @@ export default function HeroScene({
       // the beams fan out to its right. Stacked under the headline (phones,
       // tablets), it is centred with beams on both sides.
       const narrow = boxWidth > width * 0.7
-      // Behind the headline, the curtains of light are kept faint.
-      skyUniforms.uAurora.value = palette.aurora * (narrow ? 0.45 : 1)
       vanishX = left + boxWidth * (narrow ? 0.5 : 0.1)
       vanishY = boxTop + boxHeight * (narrow ? 0.5 : 0.46)
       const gap = Math.max(44, boxWidth * (narrow ? 0.1 : 0.14))
@@ -613,7 +651,15 @@ export default function HeroScene({
           const at = i * SPARKS_PER_BEAM + s
           sparkBase.setXYZ(at, place.x, 0, place.z)
           sparkColor.setXYZ(at, color.r, color.g, color.b)
-          sparkSeed.setXYZW(at, Math.random(), Math.random(), Math.random(), place.height * (0.5 + Math.random() * 0.45))
+          // The same spark keeps the same path however often the scene is laid out again.
+          const at4 = at * 4
+          sparkSeed.setXYZW(
+            at,
+            sparkRandom[at4] ?? 0,
+            sparkRandom[at4 + 1] ?? 0,
+            sparkRandom[at4 + 2] ?? 0,
+            place.height * (0.5 + (sparkRandom[at4 + 3] ?? 0) * 0.45),
+          )
           sparkIndex.setX(at, i)
         }
       }
@@ -625,12 +671,13 @@ export default function HeroScene({
       tokenGeometry.instanceCount = count
       sparkGeometry.setDrawRange(0, count * SPARKS_PER_BEAM)
       groundUniforms.uCount.value = count
+      groundUniforms.uLead.value = current.slice(0, count).findIndex((beacon) => beacon.lead)
 
       // Labels that would land on top of a sooner launch's label stay hidden.
       const taken: { left: number; right: number; top: number; bottom: number }[] = []
       labelShown = placements.map((place, i) => {
-        const tag = current[i]?.tag ?? ""
-        const half = (30 + tag.length * 7.6) / 2 + 3
+        const words = `${current[i]?.tag ?? ""}${current[i]?.note ? `  ${current[i]?.note}` : ""}`
+        const half = (30 + words.length * 7.6) / 2 + 3
         const y = vanishY - ((place.height + 0.35 - CAMERA_HEIGHT) / place.distance) * focal
         const rect = { left: place.screenX - half, right: place.screenX + half, top: y - 30, bottom: y + 3 }
         const clash = taken.some(
@@ -651,15 +698,17 @@ export default function HeroScene({
       groundUniforms.uLineAlpha.value = palette.lineAlpha
       groundUniforms.uGlow.value = palette.glow
       skyUniforms.uSun.value.set(palette.sun)
-      skyUniforms.uVeilA.value.set(palette.veilA)
-      skyUniforms.uVeilB.value.set(palette.veilB)
-      skyUniforms.uAurora.value = palette.aurora
+      skyUniforms.uVeil.value.set(palette.veil)
+      skyUniforms.uHaze.value = palette.haze
+      tokenUniforms.uEnvSky.value.set(palette.env.sky)
+      tokenUniforms.uEnvHorizon.value.set(palette.env.horizon)
+      tokenUniforms.uEnvGround.value.set(palette.env.ground)
+      tokenUniforms.uEnvGlow.value.set(palette.env.glow)
       dustUniforms.uTint.value.set(palette.dust)
       beamUniforms.uWhite.value = palette.additive ? 1 : 0
       beamUniforms.uOpacity.value = palette.beam
       beamUniforms.uHalo.value = palette.halo
       skyUniforms.uOpacity.value = palette.sky
-      tokenUniforms.uShade.value = palette.shade
       stars.visible = palette.stars
       for (const material of [skyMaterial, beamMaterial, sparkMaterial, dustMaterial]) {
         material.blending = palette.additive ? AdditiveBlending : NormalBlending
@@ -753,11 +802,13 @@ export default function HeroScene({
       // The camera drops in from above, then idles; the pointer nudges it and
       // scrolling lifts it up and over the runway.
       const arrive = 1 - easeOutExpo(clamp01(introTime / 2.3))
-      const scroll = clamp01(window.scrollY / Math.max(1, height * 0.85))
+      const scroll = still ? 0 : clamp01(window.scrollY / Math.max(1, height * 0.85))
       const lift = scroll * scroll * (3 - 2 * scroll)
-      drift.x += (pointer.x - drift.x) * 0.045
-      drift.y += (pointer.y - drift.y) * 0.045
-      const sway = reducedMotion ? 0 : 1
+      if (!still) {
+        drift.x += (pointer.x - drift.x) * 0.045
+        drift.y += (pointer.y - drift.y) * 0.045
+      }
+      const sway = still ? 0 : 1
       camera.position.set(
         drift.x * 1.5 + Math.sin(elapsed * 0.27) * 0.16 * sway,
         // Whatever the inputs do, the camera stays above the ground.
@@ -779,7 +830,7 @@ export default function HeroScene({
       // Where the pointer's line of sight meets the ground.
       const mouse = groundUniforms.uMouse.value
       let lit = 0
-      if (pointer.inside && !reducedMotion) {
+      if (pointer.inside && !still) {
         ray.set(pointer.x, -pointer.y, 0.5).unproject(camera).sub(camera.position)
         if (ray.y < -0.0001) {
           const reach = -camera.position.y / ray.y
@@ -790,14 +841,14 @@ export default function HeroScene({
           }
         }
       }
-      mouse.z += (lit - mouse.z) * 0.08
+      mouse.z = still ? 0 : mouse.z + (lit - mouse.z) * 0.08
 
       // The hovered beam flares; the others step back.
       for (let i = 0; i < MAX_BEACONS; i += 1) {
         const base = current[i]?.lead ? 1.3 : 1
         const target = i >= placements.length ? 0 : hovered < 0 ? base : i === hovered ? 1.9 : 0.4
         const value = gains[i] ?? 0
-        gains[i] = reducedMotion ? target : value + (target - value) * 0.14
+        gains[i] = still ? target : value + (target - value) * 0.14
         const light = groundUniforms.uBeacon.value[i]
         if (light) light.z = gains[i] ?? 0
       }
@@ -811,18 +862,69 @@ export default function HeroScene({
       }
     }
 
+    /**
+     * Watch how long frames really take. A device that cannot keep up first
+     * gets fewer pixels to fill; one that still cannot is given a single
+     * still frame, the same picture a visitor who prefers reduced motion
+     * sees. The page must never be slow for the sake of its decoration.
+     */
+    function govern(now: number, frameMs: number): void {
+      // Shader compilation makes the first frames slow on any device, and a
+      // long gap means the tab was in the background, not that drawing is slow.
+      if (now < governor.settleUntil || frameMs > 1500) return
+      governor.total += frameMs
+      governor.frames += 1
+      if (governor.frames < 20 && governor.total < 1200) return
+      const average = governor.total / governor.frames
+      governor.total = 0
+      governor.frames = 0
+      if (average <= SLOW_FRAME_MS) return
+      if (average > HOPELESS_FRAME_MS || quality <= LOWEST_QUALITY) {
+        freeze()
+        return
+      }
+      quality = Math.max(LOWEST_QUALITY, quality * 0.66)
+      governor.settleUntil = now + 400
+      resize()
+    }
+
+    /** Stop animating and leave the settled picture on screen. */
+    function freeze(): void {
+      still = true
+      stop()
+      introTime = INTRO_SECONDS
+      // The still picture is taken from the resting camera, not from wherever it was heading.
+      releasePointer()
+      drift.x = 0
+      drift.y = 0
+      groundUniforms.uMouse.value.z = 0
+      try {
+        window.sessionStorage.setItem(STILL_KEY, "1")
+      } catch {
+        // Storage can be unavailable (private mode); the scene is still frozen for this visit.
+      }
+      // The page drops its own decorative animations too (see index.css).
+      document.documentElement.dataset.lite = ""
+      renderFrame()
+    }
+
     function loop(now: number): void {
-      const delta = Math.min(0.05, (now - last) / 1000)
+      const frameMs = now - last
+      const delta = Math.min(0.05, frameMs / 1000)
       last = now
       elapsed += delta
       introTime += delta
       renderFrame()
       frame = requestAnimationFrame(loop)
+      govern(now, frameMs)
     }
 
     function start(): void {
-      if (frame || reducedMotion || !visible || document.hidden) return
+      if (frame || still || !visible || document.hidden) return
       last = performance.now()
+      governor.settleUntil = last + 700
+      governor.total = 0
+      governor.frames = 0
       frame = requestAnimationFrame(loop)
     }
 
@@ -837,7 +939,7 @@ export default function HeroScene({
       if (width === 0 || height === 0) return
       // Keep the pixel count in check on very large or very dense screens.
       const budget = Math.sqrt(4_600_000 / (width * height))
-      const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, budget))
+      const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, budget)) * quality
       renderer.setPixelRatio(ratio)
       renderer.setSize(width, height, false)
       canvas.style.width = `${width}px`
@@ -867,7 +969,7 @@ export default function HeroScene({
       },
       setHover(index) {
         hovered = index
-        if (reducedMotion) renderFrame()
+        if (still) renderFrame()
       },
     }
 
@@ -912,6 +1014,7 @@ export default function HeroScene({
       }
     })
 
+    if (storedStill()) document.documentElement.dataset.lite = ""
     applyTheme((document.documentElement.dataset.theme as ResolvedTheme | undefined) ?? "dark")
     resize()
     resizeObserver.observe(host)
@@ -1008,9 +1111,8 @@ export default function HeroScene({
             onPointerLeave={hover(-1)}
             onFocus={hover(index)}
             onBlur={hover(-1)}
-            aria-label={`${beacon.title} — ${beacon.detail}`}
             className={cn(
-              "group absolute top-0 left-0 flex origin-bottom items-center gap-1.5 rounded-full border border-line-strong bg-surface/80 py-1 pr-2.5 pl-2 font-mono text-[11px] font-semibold text-ink opacity-0 shadow-card backdrop-blur-md transition-[border-color,background-color,box-shadow] duration-200 will-change-transform hover:z-10 hover:border-[var(--sat)] hover:bg-surface hover:shadow-[0_0_24px_-4px_var(--sat)] focus-visible:z-10 focus-visible:border-[var(--sat)] focus-visible:opacity-100!",
+              "group absolute top-0 left-0 flex origin-bottom items-center gap-1.5 rounded-full border border-line-strong bg-surface/90 py-1 pr-2.5 pl-2 font-mono text-[11px] font-semibold text-ink opacity-0 shadow-card transition-[border-color,background-color,box-shadow] duration-200 will-change-transform hover:z-10 hover:border-[var(--sat)] hover:bg-surface hover:shadow-[0_0_24px_-4px_var(--sat)] focus-visible:z-10 focus-visible:border-[var(--sat)] focus-visible:opacity-100!",
               beacon.lead && "border-[var(--sat)]/60",
             )}
             style={{ "--sat": TYPE_COLOR[beacon.type][theme] } as CSSProperties}
@@ -1020,6 +1122,11 @@ export default function HeroScene({
               className={cn("size-1.5 shrink-0 rounded-full bg-[var(--sat)]", beacon.lead && "animate-pulse-dot")}
             />
             {beacon.tag}
+            {beacon.note && <span className="font-medium text-ink-faint">{beacon.note}</span>}
+            {/* The name a screen reader hears starts with what is on the label, then says what it is. */}
+            <span className="sr-only">
+              {beacon.title} — {beacon.detail}
+            </span>
             {/* The whole beam is part of the button, not just the pill on top of it. */}
             <span aria-hidden className="absolute top-full left-1/2 h-[var(--beam-h,0px)] w-9 -translate-x-1/2" />
             <span

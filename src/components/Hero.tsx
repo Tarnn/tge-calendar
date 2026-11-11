@@ -113,11 +113,13 @@ function NextUp({
   const when = headline ? eventWhenLong(i18n, headline) : null
 
   return (
+    // Opaque rather than frosted: a blurred backdrop over a canvas that changes
+    // every frame has to be blurred again every frame.
     <motion.aside
       initial={{ opacity: 0, y: 32, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.8, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
-      className="beam-border grid gap-5 rounded-3xl border border-line bg-surface/70 p-5 shadow-card backdrop-blur-xl lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-8 lg:p-6"
+      className="beam-border grid gap-5 rounded-3xl border border-line bg-surface/92 p-5 shadow-card lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-8 lg:p-6"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-faint uppercase">
@@ -209,18 +211,28 @@ function sceneAllowed(): boolean {
   return connection?.saveData !== true
 }
 
-/** three.js is ~135 kB gzipped: it is fetched once the browser has nothing better to do. */
+/**
+ * three.js is ~140 kB gzipped and compiling its shaders keeps the main thread
+ * busy. The copy comes first: the scene is fetched only after the headline has
+ * had time to land, and then only when the browser has nothing better to do.
+ */
 function useIdle(enabled: boolean): boolean {
   const [idle, setIdle] = useState(false)
 
   useEffect(() => {
     if (!enabled) return
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(() => setIdle(true), { timeout: 1200 })
-      return () => window.cancelIdleCallback(id)
+    let idleId = 0
+    const timer = globalThis.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(() => setIdle(true), { timeout: 1500 })
+      } else {
+        setIdle(true)
+      }
+    }, 900)
+    return () => {
+      globalThis.clearTimeout(timer)
+      if (idleId) window.cancelIdleCallback(idleId)
     }
-    const id = globalThis.setTimeout(() => setIdle(true), 250)
-    return () => globalThis.clearTimeout(id)
   }, [enabled])
 
   return enabled && idle
@@ -256,6 +268,16 @@ function Magnetic({ children, className }: { children: ReactNode; className?: st
   )
 }
 
+/** "2d 4h", "5h 41m" or "12m" until an event, or nothing once it has begun. */
+function timeLeft(event: TgeEvent, now: Date): string | undefined {
+  const target = countdownTarget(event)
+  if (!target) return undefined
+  const { totalMs, days, hours, minutes } = countdownParts(target, now)
+  if (totalMs <= 0) return undefined
+  if (days > 0) return `${days}d ${hours}h`
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
 const EASE = [0.16, 1, 0.3, 1] as const
 /** Each word climbs out from behind the line below it. */
 const WORD = {
@@ -265,6 +287,15 @@ const WORD = {
 const RISE = {
   hidden: { opacity: 0, y: 18, filter: "blur(6px)" },
   shown: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: EASE } },
+}
+/**
+ * For the paragraph that is the largest text on the page: it slides into place
+ * but is never invisible, so the browser can paint it (and count it as the
+ * page's main content) on the very first frame.
+ */
+const SETTLE = {
+  hidden: { y: 14 },
+  shown: { y: 0, transition: { duration: 0.7, ease: EASE } },
 }
 
 function Word({ children, className }: { children: ReactNode; className?: string }) {
@@ -297,8 +328,10 @@ export function Hero({
   const [ready, setReady] = useState(false)
   const reduced = useReducedMotion()
   const wide = useMediaQuery("(min-width: 1024px)")
-  // The runway only needs to know the time to within a few minutes.
+  // The runway only needs to know the time to within a few minutes; the
+  // countdown on the lead launch's label, to the minute.
   const now = useNow(600_000)
+  const minute = useNow(60_000)
 
   // Scrolling lifts the camera over the runway (inside the scene) while the
   // copy drifts up a little faster than the page and the scene fades out.
@@ -323,9 +356,10 @@ export function Hero({
           status: event.status,
           days: daysUntil(event, now),
           lead: event.id === headline?.id,
+          note: event.id === headline?.id ? timeLeft(event, minute) : undefined,
         }))
         .sort((a, b) => a.days - b.days),
-    [launches, wide, now, headline, i18n, t],
+    [launches, wide, now, minute, headline, i18n, t],
   )
 
   const marks = useMemo<RunwayMark[]>(() => {
@@ -434,7 +468,7 @@ export function Hero({
           {allowed && (
             <div
               ref={anchorRef}
-              className="relative mt-4 h-60 [grid-area:scene] sm:h-72 lg:mt-0 lg:h-auto lg:min-h-[30rem]"
+              className="relative mt-4 h-60 [grid-area:scene] sm:h-72 md:h-80 lg:mt-0 lg:h-auto lg:min-h-[30rem]"
             >
               {/* What the picture means, for anyone who wonders. */}
               <motion.p
@@ -455,7 +489,7 @@ export function Hero({
           )}
 
           <motion.p
-            variants={RISE}
+            variants={SETTLE}
             className="pointer-events-auto mt-5 max-w-xl text-base leading-relaxed text-pretty text-ink-soft [grid-area:sub] sm:text-lg"
           >
             {t("hero.subtitle")}
@@ -481,7 +515,7 @@ export function Hero({
               <button
                 type="button"
                 onClick={onOpenRadar}
-                className="group inline-flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-surface/70 px-3.5 text-sm sm:px-6 font-semibold text-ink backdrop-blur transition-colors hover:border-market/50 hover:bg-raised"
+                className="group inline-flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-surface/90 px-3.5 text-sm sm:px-6 font-semibold text-ink transition-colors hover:border-market/50 hover:bg-raised"
               >
                 <Radar aria-hidden className="size-4 text-market transition-transform duration-500 group-hover:rotate-90" />
                 {t("hero.ctaRadar")}

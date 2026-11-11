@@ -6,23 +6,6 @@
 const COMMON = /* glsl */ `
   #define MAX_BEACONS 12
   float hash11(float n) { return fract(sin(n * 127.1) * 43758.5453123); }
-  float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
-  }
-  float fbm(vec2 p) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    for (int i = 0; i < 4; i++) {
-      value += amplitude * noise(p);
-      p = p * 2.03 + vec2(17.0, 9.0);
-      amplitude *= 0.5;
-    }
-    return value;
-  }
 `
 
 /* ── Ground: the day grid, the "now" line, light pools under each beam ──── */
@@ -51,6 +34,7 @@ export const GROUND_FRAGMENT = /* glsl */ `
   uniform vec3 uAccent;
   uniform vec3 uMouse;
   uniform int uCount;
+  uniform int uLead;
   uniform vec4 uBeacon[MAX_BEACONS];
   uniform vec3 uBeaconColor[MAX_BEACONS];
   varying vec3 vWorld;
@@ -120,6 +104,15 @@ export const GROUND_FRAGMENT = /* glsl */ `
       float ring = exp(-pow((r - phase * radius * 2.6) / 0.16, 2.0)) * (1.0 - phase);
       float foot = exp(-(r * r) / 0.09);
       float light = (pool * (0.2 + 0.55 * lines) + ring * 0.5 + foot * 0.9) * beacon.z;
+      if (i == uLead) {
+        // The launch being counted down to stands inside a slowly turning, broken ring.
+        vec2 away = vWorld.xz - beacon.xy;
+        float turn = atan(away.y, away.x) + uTime * 0.3;
+        float gap = smoothstep(0.3, 0.42, abs(fract(turn * 8.0 / 6.2831853) - 0.5) * 2.0);
+        float reticle = exp(-pow((r - radius * 0.7) / 0.045, 2.0)) * gap;
+        float inner = exp(-pow((r - radius * 0.46) / 0.025, 2.0)) * 0.45;
+        light += (reticle + inner) * 0.8 * beacon.z;
+      }
       color = mix(color, uBeaconColor[i], clamp(light * 2.2, 0.0, 1.0));
       alpha += light * uGlow;
     }
@@ -254,7 +247,10 @@ export const TOKEN_FRAGMENT = /* glsl */ `
   precision highp float;
   uniform vec3 uCam;
   uniform float uOpacity;
-  uniform float uShade;
+  uniform vec3 uEnvSky;
+  uniform vec3 uEnvHorizon;
+  uniform vec3 uEnvGround;
+  uniform vec3 uEnvGlow;
   varying vec3 vNormal;
   varying vec3 vWorld;
   varying vec3 vColor;
@@ -262,23 +258,46 @@ export const TOKEN_FRAGMENT = /* glsl */ `
   varying vec3 vLocalNormal;
   varying float vGain;
 
+  // What a polished surface sees around it: sky above, ground below, the
+  // glowing horizon between them and two lamps, so that a turning coin
+  // catches a highlight and loses it again.
+  vec3 surroundings(vec3 r) {
+    float h = r.y;
+    vec3 color = h > 0.0
+      ? mix(uEnvHorizon, uEnvSky, smoothstep(0.0, 0.85, h))
+      : mix(uEnvHorizon * 0.55, uEnvGround, smoothstep(0.0, -0.45, h));
+    color += uEnvGlow * exp(-abs(h) * 8.0) * 1.25;
+    color += vec3(1.0) * pow(max(dot(r, normalize(vec3(0.35, 0.5, 0.8))), 0.0), 42.0) * 1.7;
+    color += vec3(0.72, 0.82, 1.0) * pow(max(dot(r, normalize(vec3(-0.62, 0.25, 0.6))), 0.0), 14.0) * 0.45;
+    return color;
+  }
+
   void main() {
     vec3 n = normalize(vNormal);
     vec3 v = normalize(uCam - vWorld);
-    float facing = abs(dot(n, v));
-    float rim = pow(1.0 - facing, 2.2);
-    // The coin's axis is z before it spins, so its two faces are the z caps.
-    float r = length(vLocal.xy) * 2.0;
-    float face = step(0.5, abs(vLocalNormal.z));
-    float ring = smoothstep(0.07, 0.0, abs(r - 0.76));
-    float pip = smoothstep(0.26, 0.2, r);
-    float engraving = (ring + pip) * face;
-    // A face catches the light as it turns towards the viewer; the milled edge always does.
-    float sheen = pow(facing, 5.0);
-    vec3 faceColor = vColor * (uShade + (0.8 - uShade) * sheen) + vColor * engraving * 0.5 + vec3(1.0) * pow(facing, 60.0) * 0.14;
-    vec3 edgeColor = vColor * 1.1 + vec3(1.0) * 0.08;
-    vec3 color = mix(edgeColor, faceColor, face) + vColor * rim * 0.6;
-    gl_FragColor = vec4(color * (0.75 + 0.25 * vGain), uOpacity * clamp(vGain, 0.4, 1.0));
+    if (dot(n, v) < 0.0) n = -n;
+
+    // Relief struck into the two faces (the coin's axis is z before it spins):
+    // a groove inside the rim and twelve marks round it, like a dial.
+    float face = smoothstep(0.55, 0.9, abs(vLocalNormal.z));
+    float radius = length(vLocal.xy);
+    float angle = atan(vLocal.y, vLocal.x);
+    float groove = smoothstep(0.014, 0.0, abs(radius - 0.285));
+    float mark = smoothstep(0.1, 0.02, abs(fract(angle * 12.0 / 6.2831853 + 0.5) - 0.5))
+      * smoothstep(0.012, 0.0, abs(radius - 0.215) - 0.035);
+    float boss = smoothstep(0.075, 0.06, radius);
+    float relief = 1.0 + face * (boss * 0.35 - groove * 0.45 - mark * 0.4);
+    // The edge is reeded.
+    float reeding = mix(0.82 + 0.18 * step(0.5, fract(angle * 44.0 / 6.2831853)), 1.0, face);
+
+    vec3 metal = mix(vColor, vec3(1.0), 0.16);
+    vec3 reflected = surroundings(reflect(-v, n));
+    float grazing = pow(1.0 - max(dot(n, v), 0.0), 4.0);
+    vec3 color = reflected * metal * relief * reeding + reflected * grazing * 0.45;
+    // Standing in its beam, the coin is lit in the beam's own colour.
+    color += vColor * (0.2 + 0.12 * vGain);
+    color = color / (1.0 + color * 0.26);
+    gl_FragColor = vec4(color, uOpacity * clamp(vGain, 0.45, 1.0));
   }
 `
 
@@ -384,15 +403,12 @@ export const SKY_VERTEX = /* glsl */ `
 
 export const SKY_FRAGMENT = /* glsl */ `
   precision highp float;
-  ${COMMON}
-  uniform float uTime;
   uniform float uOpacity;
   uniform float uIntro;
-  uniform float uAurora;
+  uniform float uHaze;
   uniform float uHorizon;
   uniform vec3 uSun;
-  uniform vec3 uVeilA;
-  uniform vec3 uVeilB;
+  uniform vec3 uVeil;
   varying vec2 vUv;
 
   void main() {
@@ -407,17 +423,13 @@ export const SKY_FRAGMENT = /* glsl */ `
     float rim = exp(-abs(fy) / 0.012) * exp(-(px * px) / 0.11) * 0.5;
     float glow = core + bloom + rim;
 
-    // Curtains of light above the horizon: stretched noise, drifting sideways.
-    vec2 q = vec2(px * 2.6 + uTime * 0.01, py * 1.5);
-    float fold = fbm(vec2(q.x * 1.5 + fbm(q * 2.0 + uTime * 0.018) * 1.5, q.y * 0.55));
-    float curtain = smoothstep(0.34, 0.8, fold) * smoothstep(0.03, 0.26, py) * (1.0 - smoothstep(0.4, 0.92, py));
-    curtain *= 1.0 - smoothstep(0.12, 0.5, abs(px - 0.3));
-    vec3 veil = mix(uVeilA, uVeilB, clamp(py * 2.2 + (fold - 0.55) * 1.4, 0.0, 1.0));
+    // A cooler band of haze along the horizon, away from the sun: it gives
+    // the distance a colour of its own.
+    float haze = exp(-abs(fy) / 0.085) * (1.0 - exp(-(px * px) / 0.035)) * exp(-(px * px) / 1.1) * uHaze;
 
     float shown = clamp(uIntro * 1.4, 0.0, 1.0);
-    float veilAlpha = curtain * uAurora;
-    float alpha = clamp(glow + veilAlpha, 0.0, 1.0);
-    vec3 color = (uSun * glow + veil * veilAlpha) / max(glow + veilAlpha, 0.0001);
+    float alpha = clamp(glow + haze, 0.0, 1.0);
+    vec3 color = (uSun * glow + uVeil * haze) / max(glow + haze, 0.0001);
     gl_FragColor = vec4(color, alpha * uOpacity * shown);
   }
 `
