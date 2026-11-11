@@ -1,5 +1,6 @@
 import type { TgeEvent } from "@/types"
 import type { I18n } from "@/i18n/context"
+import { formatProbability } from "@/lib/format"
 import {
   dayKeyToLocalDate,
   diffDays,
@@ -36,6 +37,20 @@ function formatRange(ctx: Ctx, start: DayKey, end: DayKey): string {
   return formatter.formatRange(dayKeyToLocalDate(start), dayKeyToLocalDate(end))
 }
 
+/**
+ * A market entry with no likely date has no meaningful window to print, so it
+ * reads as its best odds instead: "39% by Dec 31, 2027".
+ */
+function marketOddsLabel(ctx: Ctx, event: TgeEvent): string {
+  const points = event.signal?.launch ?? []
+  const last = points[points.length - 1]
+  if (!last) return ctx.t("radar.fdvOnly")
+  return ctx.t("radar.oddsBy", {
+    odds: formatProbability(last.probability),
+    date: format(ctx.intl, last.date, DAY_STYLES.medium),
+  })
+}
+
 /** Compact date label for chips, rows and cards. */
 export function eventWhenShort(ctx: Ctx, event: TgeEvent): string {
   const { start, end } = eventDaySpan(event)
@@ -47,6 +62,7 @@ export function eventWhenShort(ctx: Ctx, event: TgeEvent): string {
     case "deadline":
       return ctx.t("date.by", { date: formatDay(ctx, end) })
     case "window": {
+      if (event.status === "market") return marketOddsLabel(ctx, event)
       // Hand-written labels exist in English only; other locales get the computed range.
       if (event.dateLabel && ctx.locale === "en") return event.dateLabel
       const quarter = quarterOf(start, end)
@@ -84,6 +100,9 @@ export function eventWhenLong(ctx: Ctx, event: TgeEvent): { primary: string; sec
   if (event.precision === "day") return { primary: formatDay(ctx, start, "long") }
   if (event.precision === "deadline") {
     return { primary: ctx.t("date.by", { date: formatDay(ctx, end, "long") }) }
+  }
+  if (event.precision === "window" && event.status === "market") {
+    return { primary: marketOddsLabel(ctx, event) }
   }
   const rangeWithYear = new Intl.DateTimeFormat(ctx.intl, {
     month: "short",

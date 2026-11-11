@@ -73,6 +73,17 @@ describe("mergeEvents", () => {
     expect(isRadarOnly(merged[0] as TgeEvent)).toBe(true)
   })
 
+  it("keeps a thin market's likely date off the calendar", () => {
+    const likelyBy = { date: "2026-12-31", probability: 0.5 }
+    const merged = mergeEvents(
+      [],
+      [signal({ key: "trex", project: "T-REX", volumeUsd: 12, thin: true, launch: [likelyBy], likelyBy })],
+      TODAY,
+    )
+    expect(merged[0]).toMatchObject({ precision: "window", status: "market" })
+    expect(isRadarOnly(merged[0] as TgeEvent)).toBe(true)
+  })
+
   it("does not let a mainnet entry swallow the token-launch market", () => {
     const merged = mergeEvents(
       [curated({ id: "arc-mainnet", project: "Arc", type: "mainnet" })],

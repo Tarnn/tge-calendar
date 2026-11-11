@@ -19,6 +19,14 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
   pre-market contracts supply the odds of a launch by each deadline, the
   implied fully diluted valuation one day after launch, and exchange-listing
   odds.
+- **Odds you can trust more.** Thinly traded ladders often contradict
+  themselves (a launch "by June" priced above "by December"). The app smooths
+  those to a consistent curve before naming a likely date, flags them, and keeps
+  markets with under $10K traded off the calendar altogether.
+- **30-day odds trend** for the headline deadline in each event's detail view.
+- **Interactive 3D orbit.** On wide screens the next nine launches circle the
+  hero coin as labelled, clickable satellites — the sooner the launch, the
+  tighter the orbit.
 - **Countdown** to the next dated launch, in UTC and in the viewer's own timezone.
 - **Search** (`/` or `⌘K`), a quick text filter, filters by type, confidence
   and chain, and a watchlist kept in the browser.
@@ -37,6 +45,7 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
 | ----------------------------------------- | ------------------------------------------------------------- | --- |
 | Scheduled events                          | Curated dataset in [`src/data/events.ts`](src/data/events.ts) | —   |
 | Launch odds, implied FDV, listing odds    | [Polymarket Gamma API](https://docs.polymarket.com/)          | no  |
+| 30-day odds history                       | Polymarket CLOB `prices-history`                              | no  |
 | Prices, market cap, dominance             | [CoinGecko public API](https://docs.coingecko.com/)           | no  |
 | Fear & Greed index                        | [alternative.me](https://alternative.me/crypto/fear-and-greed-index/) | no  |
 

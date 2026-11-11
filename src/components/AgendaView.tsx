@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, Radar } from "lucide-react"
 import type { TgeEvent } from "@/types"
 import { useI18n } from "@/i18n/context"
 import { cn } from "@/lib/cn"
@@ -57,6 +57,15 @@ export function AgendaView({ events, now, today, onOpenEvent, isWatched, onToggl
   const i18n = useI18n()
   const { t, intl } = i18n
   const [showPast, setShowPast] = useState(false)
+  /** Months whose market-implied entries are expanded. */
+  const [openMarket, setOpenMarket] = useState<ReadonlySet<string>>(new Set())
+  const toggleMarket = (key: string): void =>
+    setOpenMarket((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   const { upcoming, past } = useMemo(() => {
     const upcomingEntries: Entry[] = []
@@ -78,8 +87,47 @@ export function AgendaView({ events, now, today, onOpenEvent, isWatched, onToggl
 
   const weekday = useMemo(() => new Intl.DateTimeFormat(intl, { weekday: "short" }), [intl])
 
+  const renderRow = ({ event, anchor, dated }: Entry, index: number) => (
+    <motion.li
+      key={event.id}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: Math.min(index, 12) * 0.02 }}
+      className="flex items-center gap-1"
+    >
+      <div className="w-12 shrink-0 text-center sm:w-14">
+        {dated ? (
+          <>
+            <div className={cn("font-display text-lg leading-none font-semibold", anchor === today && "text-brand-ink")}>
+              {Number(anchor.slice(8))}
+            </div>
+            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-ink-faint uppercase">
+              {weekday.format(dayKeyToLocalDate(anchor))}
+            </div>
+          </>
+        ) : (
+          <div className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase">TBA</div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <EventRow
+          event={event}
+          onOpen={onOpenEvent}
+          watched={isWatched(event.id)}
+          onToggleWatch={onToggleWatch}
+          trailing={dated && event.precision === "day" ? relativeDay(i18n, anchor, now) : eventWhenShort(i18n, event)}
+        />
+      </div>
+    </motion.li>
+  )
+
   const renderGroup = (group: MonthGroup) => {
     const { year, monthIndex } = parseDayKey(`${group.key}-01`)
+    // Announced events lead. Market guesses are folded away so that a month
+    // where traders expect twenty launches does not bury the two that are scheduled.
+    const announced = group.entries.filter((entry) => entry.event.status !== "market")
+    const implied = group.entries.filter((entry) => entry.event.status === "market")
+    const expanded = openMarket.has(group.key)
     return (
       <section key={group.key} className="relative">
         <h3 className="sticky top-14 z-10 -mx-1 bg-bg/90 px-1 py-2 font-display text-sm font-semibold tracking-wide text-ink-soft capitalize backdrop-blur">
@@ -87,44 +135,27 @@ export function AgendaView({ events, now, today, onOpenEvent, isWatched, onToggl
           <span className="tabular ml-2 font-mono text-xs font-normal text-ink-faint">{group.entries.length}</span>
         </h3>
         <ul className="rounded-2xl border border-line bg-surface p-1.5 shadow-card">
-          {group.entries.map(({ event, anchor, dated }, index) => (
-            <motion.li
-              key={event.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: Math.min(index, 12) * 0.02 }}
-              className="flex items-center gap-1"
-            >
-              <div className="w-12 shrink-0 text-center sm:w-14">
-                {dated ? (
-                  <>
-                    <div
-                      className={cn(
-                        "font-display text-lg leading-none font-semibold",
-                        anchor === today && "text-brand-ink",
-                      )}
-                    >
-                      {Number(anchor.slice(8))}
-                    </div>
-                    <div className="mt-0.5 text-[10px] font-medium tracking-wider text-ink-faint uppercase">
-                      {weekday.format(dayKeyToLocalDate(anchor))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-[10px] font-semibold tracking-wider text-ink-faint uppercase">TBA</div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <EventRow
-                  event={event}
-                  onOpen={onOpenEvent}
-                  watched={isWatched(event.id)}
-                  onToggleWatch={onToggleWatch}
-                  trailing={dated && event.precision === "day" ? relativeDay(i18n, anchor, now) : eventWhenShort(i18n, event)}
-                />
-              </div>
-            </motion.li>
-          ))}
+          {announced.map(renderRow)}
+          {implied.length > 0 && (
+            <li className={cn(announced.length > 0 && "mt-1 border-t border-line pt-1")}>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => toggleMarket(group.key)}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-raised"
+              >
+                <Radar aria-hidden className="size-4 shrink-0 text-market" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">
+                    {t("agenda.marketGroup", { count: implied.length })}
+                  </span>
+                  <span className="block text-xs text-ink-faint">{t("agenda.marketGroupHint")}</span>
+                </span>
+                <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-ink-faint transition-transform", expanded && "rotate-180")} />
+              </button>
+              {expanded && <ul>{implied.map(renderRow)}</ul>}
+            </li>
+          )}
         </ul>
       </section>
     )

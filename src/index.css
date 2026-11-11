@@ -94,6 +94,8 @@
   --animate-pop: pop 0.14s ease-out;
   --animate-fade: fade 0.18s ease-out;
   --animate-sheet: sheet 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-sheet-out: sheet-out 0.16s ease-in forwards;
+  --animate-fade-out: fade-out 0.16s ease-in forwards;
 
   @keyframes pulse-dot {
     0%,
@@ -137,6 +139,17 @@
     }
     to {
       height: 0;
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+    }
+  }
+  @keyframes fade-out {
+    to {
+      opacity: 0;
     }
   }
   @keyframes shimmer {
@@ -251,6 +264,25 @@
     .ticker-copy {
       display: none;
     }
+  }
+
+  /* Card that lights up under the pointer; --spot-x/y are set from JS. */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    background: radial-gradient(
+      18rem circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      color-mix(in oklab, var(--market) 16%, transparent),
+      transparent 70%
+    );
+  }
+  .spotlight:hover::before {
+    opacity: 1;
   }
 
   .tabular {

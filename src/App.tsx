@@ -131,6 +131,9 @@ export default function App() {
     [upcomingDated, headline, today],
   )
 
+  /** The nine nearest launches circle the hero coin. */
+  const orbit = useMemo(() => upcomingDated.slice(0, 9), [upcomingDated])
+
   const stats = useMemo<HeroStats>(() => {
     const bounds = monthBounds(monthOf(today))
     const announced = events.filter((event) => event.status !== "market")
@@ -247,6 +250,7 @@ export default function App() {
             stats={stats}
             headline={headline}
             following={following}
+            orbit={orbit}
             onOpenEvent={openEvent}
             onOpenCalendar={() => navigate("month")}
             onOpenRadar={() => navigate("radar")}

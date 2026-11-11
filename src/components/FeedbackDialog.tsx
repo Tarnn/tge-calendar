@@ -53,8 +53,8 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=open]:animate-fade" />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 shadow-card outline-none data-[state=open]:animate-sheet sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-[min(30rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-7">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade" />
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 shadow-card outline-none data-[state=closed]:animate-sheet-out data-[state=open]:animate-sheet sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-[min(30rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-7">
           <Dialog.Title className="pr-10 font-display text-xl font-semibold tracking-tight">{t("feedback.title")}</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-ink-soft">
             {t("feedback.intro")}

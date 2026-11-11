@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { AlertTriangle, Droplet } from "lucide-react"
 import { motion } from "framer-motion"
 import { RefreshCw } from "lucide-react"
 import type { TgeEvent } from "@/types"
@@ -21,8 +22,18 @@ const SORT_LABEL = {
   fdv: "radar.sortFdv",
 } as const
 
+/** Cards rendered at first, and added by each "show more". */
+const PAGE_SIZE = 18
+
 /** Moves smaller than this are noise and are not called out on a card. */
 const NOTABLE_MOVE = 0.02
+
+/** Feeds the pointer position to CSS so a card can light up under the cursor. */
+function trackPointer(event: React.PointerEvent<HTMLElement>): void {
+  const rect = event.currentTarget.getBoundingClientRect()
+  event.currentTarget.style.setProperty("--spot-x", `${event.clientX - rect.left}px`)
+  event.currentTarget.style.setProperty("--spot-y", `${event.clientY - rect.top}px`)
+}
 
 function compare(mode: SortMode): (a: TgeEvent, b: TgeEvent) => number {
   return (a, b) => {
@@ -59,6 +70,7 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
   const i18n = useI18n()
   const { t, intl } = i18n
   const [sort, setSort] = useState<SortMode>("likely")
+  const [limit, setLimit] = useState(PAGE_SIZE)
 
   const cards = useMemo(() => events.filter((event) => event.signal).sort(compare(sort)), [events, sort])
 
@@ -91,15 +103,22 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
               {t(live.isStale ? "radar.cached" : "radar.updated", { time })}
             </span>
           )}
-          <div role="group" aria-label={t("view.label")} className="flex rounded-xl border border-line bg-surface p-1">
+          <div
+            role="group"
+            aria-label={t("view.label")}
+            className="no-scrollbar flex max-w-full overflow-x-auto rounded-xl border border-line bg-surface p-1"
+          >
             {SORTS.map((mode) => (
               <button
                 key={mode}
                 type="button"
                 aria-pressed={sort === mode}
-                onClick={() => setSort(mode)}
+                onClick={() => {
+                  setSort(mode)
+                  setLimit(PAGE_SIZE)
+                }}
                 className={cn(
-                  "h-7 rounded-lg px-2.5 text-xs font-medium transition-colors",
+                  "h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium whitespace-nowrap transition-colors",
                   sort === mode ? "bg-raised text-ink shadow-[inset_0_0_0_1px_var(--line-strong)]" : "text-ink-faint hover:text-ink-soft",
                 )}
               >
@@ -140,7 +159,7 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((event, index) => {
+          {cards.slice(0, limit).map((event, index) => {
             const signal = event.signal
             if (!signal) return null
             const scheduled = event.status !== "market"
@@ -154,7 +173,8 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: Math.min(index, 9) * 0.03, layout: { duration: 0.3 } }}
-                className="group relative flex flex-col rounded-3xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-line-strong"
+                onPointerMove={trackPointer}
+                className="spotlight group relative flex flex-col rounded-3xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-line-strong"
               >
                 <div className="flex items-start gap-3">
                   <Avatar event={event} size={44} />
@@ -176,7 +196,9 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
                           {t("radar.likelyBy", { date: formatDeadline(i18n, signal.likelyBy.date, today) })}
                         </span>
                       ) : (
-                        <span className="text-ink-faint">{t("radar.noDate")}</span>
+                        <span className="text-ink-faint">
+                          {t(signal.launch.length > 0 ? "radar.noDate" : "radar.fdvOnly")}
+                        </span>
                       )}
                       {Math.abs(move) >= NOTABLE_MOVE && (
                         <span className={cn("tabular ml-2 font-mono text-xs", move > 0 ? "text-ok" : "text-bad")}>
@@ -192,6 +214,29 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
                     className="relative z-10 -mt-1 -mr-1"
                   />
                 </div>
+
+                {(signal.thin || signal.inconsistent) && (
+                  <p className="relative z-10 mt-3 flex flex-wrap gap-1.5">
+                    {signal.thin && (
+                      <span
+                        title={t("radar.thinHelp")}
+                        className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[11px] font-medium text-warn"
+                      >
+                        <Droplet aria-hidden className="size-3" />
+                        {t("radar.thin")}
+                      </span>
+                    )}
+                    {signal.inconsistent && (
+                      <span
+                        title={t("radar.inconsistentHelp")}
+                        className="inline-flex items-center gap-1 rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[11px] font-medium text-warn"
+                      >
+                        <AlertTriangle aria-hidden className="size-3" />
+                        {t("radar.inconsistent")}
+                      </span>
+                    )}
+                  </p>
+                )}
 
                 {scheduled && (
                   <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-raised px-3 py-2 text-xs text-ink-soft">
@@ -234,6 +279,18 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
             )
           })}
         </ul>
+      )}
+
+      {!live.isLoading && cards.length > limit && (
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setLimit((value) => value + PAGE_SIZE)}
+            className="h-10 rounded-full border border-line-strong bg-surface px-5 text-sm font-medium text-ink transition-colors hover:bg-raised"
+          >
+            {t("radar.showMore", { count: Math.min(PAGE_SIZE, cards.length - limit) })}
+          </button>
+        </div>
       )}
     </div>
   )

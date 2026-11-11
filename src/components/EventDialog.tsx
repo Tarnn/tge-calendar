@@ -1,5 +1,7 @@
+import { useState } from "react"
 import * as Dialog from "@radix-ui/react-dialog"
-import { AlertTriangle, CalendarPlus, Download, ExternalLink, Link2, Star, X } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { AlertTriangle, CalendarPlus, Download, Droplet, ExternalLink, Link2, Star, X } from "lucide-react"
 import { toast } from "sonner"
 import type { TgeEvent } from "@/types"
 import { useI18n } from "@/i18n/context"
@@ -8,7 +10,8 @@ import { cn } from "@/lib/cn"
 import { countdownParts, countdownTarget, isPast } from "@/lib/dates"
 import { buildIcs, downloadFile, googleCalendarUrl } from "@/lib/export"
 import { eventWhenLong, formatDay } from "@/lib/eventText"
-import { formatUsdCompact } from "@/lib/format"
+import { formatProbability, formatUsdCompact } from "@/lib/format"
+import { fetchOddsHistory, type OddsHistoryPoint } from "@/lib/history"
 import { isRadarOnly } from "@/lib/merge"
 import { Avatar, StatusBadge, TypeBadge } from "@/components/EventBits"
 import { OddsBars } from "@/components/OddsBars"
@@ -41,6 +44,77 @@ function Countdown({ event }: { event: TgeEvent }) {
         ))}
       </div>
     </div>
+  )
+}
+
+/** A month of odds for the headline deadline, drawn as an area sparkline. */
+function TrendChart({ points }: { points: OddsHistoryPoint[] }) {
+  const width = 560
+  const height = 96
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (!first || !last || points.length < 2) return null
+  const span = last.t - first.t || 1
+  const x = (t: number): number => ((t - first.t) / span) * width
+  const y = (p: number): number => height - 4 - p * (height - 8)
+  const line = points.map((point) => `${x(point.t).toFixed(1)},${y(point.p).toFixed(1)}`).join(" ")
+  const delta = Math.round((last.p - first.p) * 100)
+  return (
+    <figure>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`${formatProbability(first.p)} → ${formatProbability(last.p)}`}
+        className="h-24 w-full overflow-visible"
+      >
+        <defs>
+          <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--market)" stopOpacity="0.35" />
+            <stop offset="1" stopColor="var(--market)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* 50% reference line */}
+        <line x1="0" x2={width} y1={y(0.5)} y2={y(0.5)} stroke="var(--line-strong)" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
+        <polygon points={`0,${height} ${line} ${width},${height}`} fill="url(#trend-fill)" />
+        <polyline
+          points={line}
+          fill="none"
+          stroke="var(--market)"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <figcaption className="tabular mt-1 flex justify-between font-mono text-xs text-ink-faint">
+        <span>{formatProbability(first.p)}</span>
+        <span className={cn(delta > 0 ? "text-ok" : delta < 0 ? "text-bad" : "text-ink-faint")}>
+          {delta > 0 ? `+${delta}` : delta < 0 ? `−${Math.abs(delta)}` : "±0"} pts
+        </span>
+        <span className="font-semibold text-ink">{formatProbability(last.p)}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
+function Trend({ token, date }: { token: string; date: string }) {
+  const i18n = useI18n()
+  // Decoration on top of the odds: if the history call fails the section simply does not appear.
+  const { data } = useQuery({
+    queryKey: ["odds-history", token],
+    queryFn: ({ signal }) => fetchOddsHistory(token, signal),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  if (!data || data.length < 2) return null
+  return (
+    <Section
+      title={i18n.t("event.trend")}
+      hint={i18n.t("event.trendHint", { date: i18n.t("date.by", { date: formatDay(i18n, date, "medium") }) })}
+    >
+      <TrendChart points={data} />
+    </Section>
   )
 }
 
@@ -148,6 +222,31 @@ function Body({
           ))}
         </ul>
       )}
+
+      {signal && (signal.thin || signal.inconsistent) && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-warn/40 bg-warn/10 p-4 text-sm text-ink">
+          {signal.thin && (
+            <p className="flex gap-3">
+              <Droplet aria-hidden className="mt-0.5 size-4 shrink-0 text-warn" />
+              <span>
+                <span className="font-semibold">{t("radar.thin")}: </span>
+                {t("radar.thinHelp")}
+              </span>
+            </p>
+          )}
+          {signal.inconsistent && (
+            <p className="flex gap-3">
+              <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0 text-warn" />
+              <span>
+                <span className="font-semibold">{t("radar.inconsistent")}: </span>
+                {t("radar.inconsistentHelp")}
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {signal?.trend && <Trend token={signal.trend.token} date={signal.trend.date} />}
 
       {signal && signal.launch.length > 0 && (
         <Section title={t("event.odds")} hint={t("event.oddsHint")}>
@@ -271,15 +370,18 @@ export interface EventDialogProps {
 /** Bottom sheet on phones, centred dialog from `sm` up. */
 export function EventDialog({ event, onClose, watched, onToggleWatch }: EventDialogProps) {
   const { t } = useI18n()
+  // Keep showing the last event while the dialog animates out, so it does not collapse mid-exit.
+  const [shown, setShown] = useState(event)
+  if (event && event !== shown) setShown(event)
   return (
     <Dialog.Root open={event !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=open]:animate-fade" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm data-[state=closed]:animate-fade-out data-[state=open]:animate-fade" />
         <Dialog.Content
-          className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 shadow-card outline-none data-[state=open]:animate-sheet sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[88dvh] sm:w-[min(40rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-7"
+          className="fixed inset-x-0 bottom-0 z-50 max-h-[92dvh] overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 shadow-card outline-none data-[state=closed]:animate-sheet-out data-[state=open]:animate-sheet sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[88dvh] sm:w-[min(40rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-7"
           style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
         >
-          {event && <Body event={event} watched={watched} onToggleWatch={onToggleWatch} />}
+          {shown && <Body event={shown} watched={watched} onToggleWatch={onToggleWatch} />}
           <Dialog.Close
             aria-label={t("event.close")}
             className="absolute top-4 right-4 grid size-9 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink"
