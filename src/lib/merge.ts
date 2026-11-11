@@ -1,8 +1,10 @@
 import type { MarketSignal, TgeEvent } from "@/types"
+import { applyListings } from "@/lib/listingEvents"
+import type { ListingFeed } from "@/lib/listings"
 import { projectKey } from "@/lib/polymarket"
 
 /** Event types a launch-odds market has something to say about. */
-const SIGNAL_TYPES = new Set<TgeEvent["type"]>(["tge", "sale", "airdrop", "mainnet"])
+const SIGNAL_TYPES = new Set<TgeEvent["type"]>(["tge", "listing", "sale", "airdrop", "mainnet"])
 
 function eventKey(event: TgeEvent): string {
   return event.marketKey ?? projectKey(event.project)
@@ -31,22 +33,28 @@ export function signalToEvent(signal: MarketSignal, today: string): TgeEvent {
 }
 
 /**
- * Join the curated calendar with live market signals.
- * - a curated event gains the signal for its project
+ * Join the curated calendar with the live sources.
+ * - exchange announcements confirm a tracked launch or add a listing of their own
+ * - a scheduled event gains the Polymarket signal for its project
  * - a project that only exists on Polymarket becomes a "market" event
  */
-export function mergeEvents(curated: TgeEvent[], signals: MarketSignal[], today: string): TgeEvent[] {
+export function mergeEvents(
+  curated: TgeEvent[],
+  signals: MarketSignal[],
+  today: string,
+  listings?: ListingFeed,
+): TgeEvent[] {
   const byKey = new Map(signals.map((signal) => [signal.key, signal]))
   const covered = new Set<string>()
 
-  const merged = curated.map((event) => {
+  const merged = applyListings(curated, listings).map((event) => {
     if (!SIGNAL_TYPES.has(event.type)) return event
     const key = eventKey(event)
     const signal = byKey.get(key)
     if (!signal) return event
-    // A scheduled token launch answers the question the market is asking, so
-    // the project needs no separate market-only entry.
-    if (event.type === "tge") covered.add(key)
+    // A scheduled launch or listing answers the question the market is asking,
+    // so the project needs no separate market-only entry.
+    if (event.type === "tge" || event.type === "listing") covered.add(key)
     return { ...event, signal }
   })
 

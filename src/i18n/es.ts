@@ -24,7 +24,7 @@ export const es: Messages = {
   "hero.titleA": "Cada lanzamiento de token,",
   "hero.titleB": "antes de que cotice.",
   "hero.subtitle":
-    "TGE, ventas, airdrops y desbloqueos programados, con una fuente en cada fecha, y las probabilidades en vivo de los mercados de predicción para los lanzamientos que nadie ha anunciado todavía.",
+    "TGE, listados, ventas, airdrops y desbloqueos programados, con una fuente en cada fecha, y las probabilidades en vivo de los mercados de predicción para los lanzamientos que nadie ha anunciado todavía.",
   "hero.ctaCalendar": "Abrir el calendario",
   "hero.ctaRadar": "Ver probabilidades",
   "stats.upcoming": "eventos próximos",
@@ -64,6 +64,7 @@ export const es: Messages = {
   "export.empty": "No hay nada que exportar con estos filtros",
 
   "type.tge": "TGE",
+  "type.listing": "Listado",
   "type.sale": "Venta de tokens",
   "type.airdrop": "Airdrop",
   "type.unlock": "Desbloqueo",
@@ -73,7 +74,7 @@ export const es: Messages = {
   "status.expected": "Previsto",
   "status.tentative": "Provisional",
   "status.market": "Implícito por el mercado",
-  "statusHelp.confirmed": "Anunciado por el propio proyecto.",
+  "statusHelp.confirmed": "Anunciado por el propio proyecto o por un exchange que lista el token.",
   "statusHelp.expected": "Aparece en rastreadores; el equipo no lo ha confirmado.",
   "statusHelp.tentative": "Las fuentes no coinciden o el equipo no ha reconocido la fecha.",
   "statusHelp.market": "Sin fecha anunciada. Derivado de las cuotas de Polymarket.",
@@ -187,10 +188,10 @@ export const es: Messages = {
     "Un evento de generación de tokens es el momento en que el token de un proyecto se crea y pasa a ser transferible. A menudo, aunque no siempre, coincide con el primer listado en un exchange, la apertura de un airdrop o ambos.",
   "faq.q2": "¿De dónde salen las fechas?",
   "faq.a2":
-    "Los eventos programados se recopilan de rastreadores públicos y anuncios de los proyectos, y cada entrada enlaza a su fuente. Las probabilidades de lanzamiento, las valoraciones implícitas y las de listado se obtienen en vivo de Polymarket. Los precios vienen de CoinGecko y el índice de sentimiento de alternative.me.",
+    "Los eventos programados se recopilan de rastreadores públicos y anuncios de los proyectos, y cada entrada enlaza a su fuente. Los nuevos listados en exchanges se leen en vivo de los anuncios de los propios exchanges, con la hora de inicio de trading que indica KuCoin. Las probabilidades de lanzamiento, las valoraciones implícitas y las de listado se obtienen en vivo de Polymarket. Los precios vienen de CoinGecko y el índice de sentimiento de alternative.me.",
   "faq.q3": "¿Qué significan las etiquetas de fiabilidad?",
   "faq.a3":
-    "Confirmado: lo anunció el proyecto. Previsto: aparece en rastreadores pero el equipo no lo ha confirmado. Provisional: las fuentes no coinciden o el equipo guarda silencio. Implícito por el mercado: no hay fecha anunciada y el momento se deduce de los precios de los mercados de predicción.",
+    "Confirmado: lo anunció el proyecto, o un exchange anunció el listado. Previsto: aparece en rastreadores pero el equipo no lo ha confirmado. Provisional: las fuentes no coinciden o el equipo guarda silencio. Implícito por el mercado: no hay fecha anunciada y el momento se deduce de los precios de los mercados de predicción.",
   "faq.q4": "¿Qué tan fiable es?",
   "faq.a4":
     "Las fechas de lanzamiento se retrasan constantemente. Toma todo esto como punto de partida y confírmalo en los canales oficiales del proyecto antes de actuar. Nunca uses un enlace de reclamo que no venga del propio proyecto.",
@@ -228,7 +229,10 @@ export const es: Messages = {
   "footer.donate": "Donar (Solana)",
   "footer.copied": "Dirección de Solana copiada",
   "footer.copyFailed": "No se pudo copiar. Dirección: {address}",
-  "footer.data": "Datos curados verificados el {date}. Cuotas en vivo de Polymarket, precios de CoinGecko.",
+  "footer.data":
+    "Datos curados verificados el {date}. Listados en vivo de los anuncios de los exchanges, cuotas de Polymarket, precios de CoinGecko.",
+  "data.stale":
+    "Las fechas curadas se revisaron por última vez hace {count} días, el {date}. Los listados en exchanges y las cuotas de mercado siguen en vivo; confirma lo demás con el proyecto.",
   "footer.contribute": "Añadir o corregir un evento",
   "footer.rights": "Código abierto en GitHub.",
 }

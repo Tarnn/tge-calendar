@@ -239,6 +239,81 @@ describe("App", () => {
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("polymarket.com"))).toBe(false)
   })
 
+  it("puts exchange listings from the API on the calendar", async () => {
+    const fetchMock = stubFetch()
+    const upstream = fetchMock.getMockImplementation() as (input: RequestInfo | URL) => Promise<Response>
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (!String(input).endsWith("/api/listings.json")) return upstream(input)
+      return json({
+        generatedAt: NOW.getTime(),
+        live: true,
+        listings: [
+          {
+            id: "kucoin-1",
+            project: "Nova Chain",
+            symbol: "NOVA",
+            tradingAt: "2026-11-12T09:00:00Z",
+            premiere: false,
+            venue: "KuCoin",
+            link: { label: "KuCoin — listing announcement", url: "https://www.kucoin.com/announcement/1" },
+          },
+          {
+            id: "kucoin-2",
+            project: "Kor Protocol",
+            symbol: "KOR",
+            tradingAt: "2026-11-04T14:00:00Z",
+            premiere: true,
+            venue: "KuCoin",
+            link: {
+              label: "KuCoin — listing announcement",
+              url: "https://www.kucoin.com/announcement/en-hodler-airdrops-kor-protocol-kor-world-premiere-listing-on-kucoin",
+            },
+          },
+        ],
+        mentions: [],
+      })
+    })
+    const user = userEvent.setup()
+    renderApp()
+
+    // A listing nobody curated becomes the next launch on the page…
+    const nextUp = screen.getByText("Next up").closest("aside") as HTMLElement
+    expect(await within(nextUp).findByText("Nova Chain")).toBeInTheDocument()
+    const grid = screen.getByRole("grid")
+    await user.click(within(grid).getByRole("button", { name: "NOVA" }))
+    let dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("Listing")).toBeInTheDocument()
+    expect(within(dialog).getByText(/09:00 UTC/)).toBeInTheDocument()
+    expect(within(dialog).getByRole("link", { name: /KuCoin/ })).toHaveAttribute(
+      "href",
+      "https://www.kucoin.com/announcement/1",
+    )
+    await user.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+
+    // …and one that matches a tracked launch confirms it instead of duplicating it.
+    expect(within(grid).getAllByRole("button", { name: "KOR" })).toHaveLength(1)
+    await user.click(within(grid).getByRole("button", { name: "KOR" }))
+    dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("Confirmed")).toBeInTheDocument()
+    expect(within(dialog).getByText(/14:00 UTC/)).toBeInTheDocument()
+    expect(within(dialog).getByText("KuCoin, Bybit (reported)")).toBeInTheDocument()
+    expect(within(dialog).getAllByRole("link", { name: /KuCoin — listing announcement/ })).toHaveLength(1)
+    // The saved feed survives a visit where the API is unreachable.
+    expect(window.localStorage.getItem("tge:listings:v1")).toContain("kucoin-1")
+  })
+
+  it("says so when the curated dates have not been re-checked for a while", () => {
+    stubFetch()
+    renderApp()
+    expect(screen.queryByRole("note")).not.toBeInTheDocument()
+    cleanup()
+
+    vi.setSystemTime(new Date("2027-01-15T12:00:00Z"))
+    renderApp()
+    expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 65 days ago, on Nov 11, 2026\./)
+  })
+
   it("remembers the watchlist", async () => {
     stubFetch()
     const user = userEvent.setup()

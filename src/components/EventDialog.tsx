@@ -213,7 +213,7 @@ function Body({
         </dl>
       )}
 
-      {event.origin === "curated" && event.categories.length > 0 && (
+      {event.origin !== "polymarket" && event.categories.length > 0 && (
         <ul className="-mt-1 flex flex-wrap gap-1.5">
           {event.categories.map((category) => (
             <li key={category} className="rounded-full border border-line px-2.5 py-0.5 text-xs text-ink-soft">
@@ -301,7 +301,7 @@ function Body({
         </p>
       )}
 
-      {event.origin === "curated" && event.sources.length > 0 && (
+      {event.origin !== "polymarket" && event.sources.length > 0 && (
         <Section title={t("event.sources")}>
           <ul className="flex flex-col gap-1.5">
             {event.sources.map((source) => (

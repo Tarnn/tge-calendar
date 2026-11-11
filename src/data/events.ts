@@ -11,6 +11,9 @@ import type { TgeEvent } from "../types.js"
  */
 export const DATASET_VERIFIED_ON = "2026-11-11"
 
+/** Past this many days without a re-check, the page says so next to the calendar. */
+export const DATASET_STALE_AFTER_DAYS = 21
+
 type Curated = Omit<TgeEvent, "origin" | "signal">
 
 const BITRUE_NOV = {
@@ -127,15 +130,23 @@ const curated: Curated[] = [
     project: "KOR Protocol",
     symbol: "KOR",
     type: "tge",
-    status: "expected",
+    status: "confirmed",
     precision: "day",
     date: "2026-11-04",
     endDate: "2026-11-04",
+    timeUtc: "14:00",
     categories: ["AI", "IP"],
     summary: "A creative-asset clearinghouse for the AI economy. 22.87% of supply circulating at TGE.",
-    note: "Bybit spot listing reported by trackers but not confirmed by the exchange.",
-    venues: ["Bybit (reported)"],
-    sources: [BITRUE_NOV, KUCOIN_NOV],
+    note: "KuCoin opened trading as a world premiere listing. A Bybit spot listing was reported by trackers but not confirmed by the exchange.",
+    venues: ["KuCoin", "Bybit (reported)"],
+    sources: [
+      {
+        label: "KuCoin — listing announcement",
+        url: "https://www.kucoin.com/announcement/en-hodler-airdrops-kor-protocol-kor-world-premiere-listing-on-kucoin",
+      },
+      BITRUE_NOV,
+      KUCOIN_NOV,
+    ],
   },
   {
     id: "aster-stage6-claim",
@@ -192,6 +203,29 @@ const curated: Curated[] = [
     summary: "Admission-to-trading date taken from the project's whitepaper.",
     note: "The team had not confirmed this date on X when the tracker was published. No exchange listing announced.",
     sources: [BITRUE_NOV],
+  },
+  {
+    id: "matrix-tge",
+    project: "Matrix",
+    symbol: "MTX",
+    type: "tge",
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-11",
+    endDate: "2026-11-11",
+    timeUtc: "11:00",
+    chain: "BNB Chain",
+    categories: ["Rollup", "Infrastructure"],
+    summary:
+      "An execution rollup built on BNB Chain. KuCoin opens MTX/USDT as a world premiere after a call auction from 10:00 to 11:00 UTC; Bitget announced an initial listing as well.",
+    venues: ["KuCoin", "Bitget"],
+    sources: [
+      {
+        label: "KuCoin — listing announcement",
+        url: "https://www.kucoin.com/announcement/en-world-premiere-matrix-mtx-listed-on-kucoin",
+      },
+      { label: "Bitget — listing announcement", url: "https://www.bitget.com/en/support/articles/12560603900217" },
+    ],
   },
   {
     id: "allora-unlock-nov",
@@ -344,10 +378,14 @@ const curated: Curated[] = [
     categories: ["Prediction market"],
     summary:
       "Prediction-market platform. 16% of supply unlocks at TGE, with 7% set aside for the Season 1 airdrop.",
-    note: "TGE and airdrop claim were postponed around October 30. Ignore any claim site until the team posts a new time.",
-    venues: ["Binance Wallet (Pre-TGE Prime Sale)"],
+    note: "Binance had announced spot trading for October 30 at 10:00 UTC and postponed it hours before the open, until further notice; the team delayed the TGE and Season 1 airdrop claim with it. Ignore any claim site until the team posts a new time.",
+    venues: ["Binance Wallet (Pre-TGE Prime Sale)", "Binance (spot listing postponed)", "MEXC (postponed)"],
     sources: [
       { label: "CoinGabbar — Predict.fun TGE delayed", url: "https://www.coingabbar.com/en/predict-fun-tge-delayed" },
+      {
+        label: "Binance — PREDICT listing announcement (since postponed)",
+        url: "https://www.binance.com/en/support/announcement/a259777ee4104befa3daba5c1eadc7b5",
+      },
       KUCOIN_NOV,
     ],
   },

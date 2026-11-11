@@ -24,7 +24,7 @@ export const zh: Messages = {
   "hero.titleA": "每一次代币发行，",
   "hero.titleB": "抢在上线之前。",
   "hero.subtitle":
-    "已排期的 TGE、公募、空投与解锁，每个日期都附有来源；对于尚未官宣的发行，还提供预测市场的实时概率。",
+    "已排期的 TGE、上线、公募、空投与解锁，每个日期都附有来源；对于尚未官宣的发行，还提供预测市场的实时概率。",
   "hero.ctaCalendar": "打开日历",
   "hero.ctaRadar": "查看发行概率",
   "stats.upcoming": "个即将到来的事件",
@@ -64,6 +64,7 @@ export const zh: Messages = {
   "export.empty": "当前筛选下没有可导出的内容",
 
   "type.tge": "TGE",
+  "type.listing": "上线",
   "type.sale": "代币销售",
   "type.airdrop": "空投",
   "type.unlock": "解锁",
@@ -73,7 +74,7 @@ export const zh: Messages = {
   "status.expected": "预计",
   "status.tentative": "待定",
   "status.market": "市场隐含",
-  "statusHelp.confirmed": "由项目方官方公布。",
+  "statusHelp.confirmed": "由项目方官方公布，或由上线该代币的交易所公布。",
   "statusHelp.expected": "追踪网站已收录，项目方尚未确认。",
   "statusHelp.tentative": "各来源说法不一，或项目方尚未回应该日期。",
   "statusHelp.market": "尚无官方日期，根据 Polymarket 赔率推算。",
@@ -186,10 +187,10 @@ export const zh: Messages = {
     "代币生成事件（TGE）是项目代币被创建并可以转账的时刻。它通常（但并非总是）与首次上线交易所、空投开放领取同时发生。",
   "faq.q2": "日期从哪里来？",
   "faq.a2":
-    "已排期的事件整理自公开追踪网站和项目公告，每条都附有来源链接。发行概率、隐含估值和上线概率实时取自 Polymarket，价格来自 CoinGecko，情绪指数来自 alternative.me。",
+    "已排期的事件整理自公开追踪网站和项目公告，每条都附有来源链接。交易所新币上线信息实时读取自交易所官方公告，并采用 KuCoin 公布的开盘时间。发行概率、隐含估值和上线概率实时取自 Polymarket，价格来自 CoinGecko，情绪指数来自 alternative.me。",
   "faq.q3": "可信度标签是什么意思？",
   "faq.a3":
-    "已确认：项目方已公布。预计：追踪网站收录但项目方未确认。待定：来源说法不一或项目方保持沉默。市场隐含：没有任何官方日期，时间由预测市场价格推算。",
+    "已确认：项目方已公布，或交易所已公告上线。预计：追踪网站收录但项目方未确认。待定：来源说法不一或项目方保持沉默。市场隐含：没有任何官方日期，时间由预测市场价格推算。",
   "faq.q4": "准确度如何？",
   "faq.a4":
     "发行日期经常推迟。请把这里的信息当作起点，行动前务必通过项目官方渠道确认。不要使用任何非项目方发布的领取链接。",
@@ -223,7 +224,8 @@ export const zh: Messages = {
   "footer.donate": "捐赠 (Solana)",
   "footer.copied": "Solana 地址已复制",
   "footer.copyFailed": "复制失败。地址：{address}",
-  "footer.data": "精选数据集核对于 {date}。实时赔率来自 Polymarket，价格来自 CoinGecko。",
+  "footer.data": "精选数据集核对于 {date}。上线信息实时取自交易所公告，赔率来自 Polymarket，价格来自 CoinGecko。",
+  "data.stale": "精选日期上次核对是在 {count} 天前（{date}）。交易所上线信息和市场赔率仍为实时数据，其余内容请向项目方确认。",
   "footer.contribute": "添加或更正事件",
   "footer.rights": "已在 GitHub 开源。",
 }

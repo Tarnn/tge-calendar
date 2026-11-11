@@ -5,6 +5,7 @@ const SITE_URL = "https://github.com/Tarnn/tge-calendar"
 
 const TYPE_LABEL: Record<TgeEvent["type"], string> = {
   tge: "TGE",
+  listing: "Exchange listing",
   sale: "Token sale",
   airdrop: "Airdrop",
   unlock: "Token unlock",

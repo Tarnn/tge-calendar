@@ -1,4 +1,5 @@
 import type { MarketPulse, MarketSignal } from "../types.js"
+import type { ListingMention, ListingNotice } from "./listings.js"
 
 /**
  * Shapes shared by the edge functions in `api/` and the browser client.
@@ -23,6 +24,14 @@ export interface PulsePayload {
   pulse: MarketPulse
 }
 
+export interface ListingsPayload {
+  generatedAt: number
+  live: boolean
+  listings: ListingNotice[]
+  mentions: ListingMention[]
+}
+
 /** How long the CDN may serve each response before refetching upstream. */
 export const SIGNALS_CACHE_SECONDS = 300
 export const PULSE_CACHE_SECONDS = 120
+export const LISTINGS_CACHE_SECONDS = 600

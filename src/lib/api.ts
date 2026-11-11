@@ -1,5 +1,6 @@
 import type { MarketPulse, MarketSignal } from "../types"
-import type { PulsePayload, SignalsPayload } from "./payloads"
+import type { ListingsPayload, PulsePayload, SignalsPayload } from "./payloads"
+import type { ListingMention, ListingNotice } from "./listings"
 import { fetchMarketSignals } from "./polymarket"
 import { fetchMarketPulse } from "./pulse"
 
@@ -57,4 +58,21 @@ export async function loadPulse(signal?: AbortSignal): Promise<PulsePayload> {
     return { ...stamp(body), pulse }
   }
   return { generatedAt: Date.now(), live: false, pulse: await fetchMarketPulse(signal) }
+}
+
+/**
+ * Exchange listings exist only behind our own function: the exchanges' APIs
+ * send no CORS headers, so there is nothing to fall back to. Missing or
+ * failing, the app carries on with an empty feed.
+ */
+export async function loadListings(signal?: AbortSignal): Promise<ListingsPayload> {
+  const body = await getOwnJson("listings", signal)
+  if (body && Array.isArray(body.listings)) {
+    return {
+      ...stamp(body),
+      listings: body.listings as ListingNotice[],
+      mentions: Array.isArray(body.mentions) ? (body.mentions as ListingMention[]) : [],
+    }
+  }
+  return { generatedAt: Date.now(), live: false, listings: [], mentions: [] }
 }
