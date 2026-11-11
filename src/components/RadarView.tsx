@@ -93,7 +93,8 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
           <p className="mt-1 text-sm text-pretty text-ink-soft">{t("radar.subtitle")}</p>
         </div>
         <div className="flex-1" />
-        <div className="flex flex-wrap items-center gap-3">
+        {/* min-w-0 + max-w-full: lets the sort control scroll instead of widening the page on phones. */}
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-3">
           {time && (
             <span className="tabular flex items-center gap-1.5 text-xs text-ink-faint">
               <span
