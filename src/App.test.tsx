@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import App from "./App"
@@ -312,6 +312,32 @@ describe("App", () => {
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"))
     renderApp()
     expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 65 days ago, on Nov 11, 2026\./)
+  })
+
+  it("offers a way back to the top once the page has been scrolled", async () => {
+    stubFetch()
+    const scrollTo = vi.fn()
+    vi.stubGlobal("scrollTo", scrollTo)
+    const user = userEvent.setup()
+    renderApp()
+
+    // At the top there is nothing to go back to: the button is switched off.
+    expect(screen.queryByRole("button", { name: "Back to top" })).not.toBeInTheDocument()
+
+    // jsdom lays nothing out, so say where the page has been scrolled to and announce it.
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 2400 })
+    try {
+      fireEvent.scroll(window)
+      const button = await screen.findByRole("button", { name: "Back to top" })
+      expect(button).not.toHaveAttribute("inert")
+
+      await user.click(button)
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" })
+      // The keyboard is handed back to the top of the page.
+      expect(screen.getByRole("link", { name: "TGE Calendar" })).toHaveFocus()
+    } finally {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 0 })
+    }
   })
 
   it("remembers the watchlist", async () => {

@@ -236,4 +236,5 @@ export const es: Messages = {
     "Las fechas curadas se revisaron por última vez hace {count} días, el {date}. Los listados en exchanges y las cuotas de mercado siguen en vivo; confirma lo demás con el proyecto.",
   "footer.contribute": "Añadir o corregir un evento",
   "footer.rights": "Código abierto en GitHub.",
+  "scrollTop.label": "Volver arriba",
 }

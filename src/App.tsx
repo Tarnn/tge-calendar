@@ -32,6 +32,7 @@ import { Header } from "@/components/Header"
 import { Hero, type HeroStats } from "@/components/Hero"
 import { MarketTicker } from "@/components/MarketTicker"
 import { MonthView } from "@/components/MonthView"
+import { ScrollTopButton } from "@/components/ScrollTopButton"
 import { Toolbar } from "@/components/Toolbar"
 
 // The month grid is the default view and ships in the main bundle; the other
@@ -332,6 +333,8 @@ export default function App() {
         <Footer onReport={() => setFeedbackOpen(true)} />
       </div>
 
+      <ScrollTopButton />
+
       <Suspense fallback={null}>
         {dialogNeeded && (
           <EventDialog
@@ -353,7 +356,14 @@ export default function App() {
         )}
         {feedbackNeeded && <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />}
       </Suspense>
-      <Toaster theme={theme.resolved} position="bottom-right" richColors closeButton />
+      {/* Centred, and lifted on phones, so a toast never lands on the back-to-top button. */}
+      <Toaster
+        theme={theme.resolved}
+        position="bottom-center"
+        mobileOffset={{ bottom: "4.75rem" }}
+        richColors
+        closeButton
+      />
     </MotionConfig>
   )
 }

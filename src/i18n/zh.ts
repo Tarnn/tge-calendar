@@ -229,4 +229,5 @@ export const zh: Messages = {
   "data.stale": "精选日期上次核对是在 {count} 天前（{date}）。交易所上线信息和市场赔率仍为实时数据，其余内容请向项目方确认。",
   "footer.contribute": "添加或更正事件",
   "footer.rights": "已在 GitHub 开源。",
+  "scrollTop.label": "回到顶部",
 }

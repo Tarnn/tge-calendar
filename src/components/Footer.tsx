@@ -1,4 +1,4 @@
-import logoUrl from "@/assets/logo.png"
+import logoUrl from "@/assets/logo.svg"
 import { toast } from "sonner"
 import { useI18n } from "@/i18n/context"
 import { DATASET_VERIFIED_ON } from "@/data/events"
