@@ -29,9 +29,14 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
   those to a consistent curve before naming a likely date, flags them, and keeps
   markets with under $10K traded off the calendar altogether.
 - **30-day odds trend** for the headline deadline in each event's detail view.
-- **Interactive 3D orbit.** On wide screens the next nine launches circle the
-  hero coin as labelled, clickable satellites — the sooner the launch, the
-  tighter the orbit.
+- **The runway.** The hero is a WebGL scene in which time is depth: a ground
+  grid with one cell per day runs to a glowing horizon, the dates are painted
+  on it, and every upcoming event is a beam of light standing on its day —
+  nearer is sooner. A confirmed date burns steadily, an expected one breathes,
+  a tentative one is dashed. Each beam is a real button: hover or focus it for
+  the details, click it to open the event. Scrolling lifts the camera up and
+  over the runway. Visitors who prefer reduced motion get a still frame, and
+  without WebGL the page is complete without it.
 - **Countdown** to the next dated launch, in UTC and in the viewer's own timezone.
 - **Search** (`/` or `⌘K`), a quick text filter, filters by type, confidence
   and chain, and a watchlist kept in the browser.
@@ -164,13 +169,14 @@ src/
 │   ├── listings.ts       Exchange announcement parsers (KuCoin, Bitget, Binance)
 │   ├── listingEvents.ts  Folds exchange listings into the calendar
 │   ├── merge.ts          Joins curated events, listings and market signals
+│   ├── runway.ts         Layout maths for the hero scene (depth by date, beam slots)
 │   ├── dates.ts          Calendar-day maths (timezone-safe)
 │   ├── filters.ts        Filtering and ranked search
-│   └── export.ts         iCalendar, CSV, Google Calendar links
 │   ├── api.ts            Same-origin API first, upstream fallback
+│   └── export.ts         iCalendar, CSV, Google Calendar links
 ├── hooks/                Data fetching, theme, watchlist, URL hash, clock
 ├── i18n/                 en / es / zh dictionaries and provider
-├── components/           Header, hero + three.js scene, the three views, dialogs
+├── components/           Header, hero + three.js scene (shaders in hero/), the three views, dialogs
 └── App.tsx               Composition and app-level state
 api/                      Vercel edge functions: signals, pulse, listings, calendar feed
 vercel.json               Rewrites, cache and security headers

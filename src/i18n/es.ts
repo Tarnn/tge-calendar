@@ -137,7 +137,9 @@ export const es: Messages = {
   "agenda.marketGroupHint": "Sin fecha anunciada: se sitúan donde el mercado ve probable un lanzamiento",
   "event.trend": "Tendencia de 30 días",
   "event.trendHint": "Probabilidad de lanzamiento {date}",
-  "hero.orbit": "Próximos lanzamientos en órbita, los más cercanos primero",
+  "hero.runway": "Próximos lanzamientos en la línea de tiempo, los más cercanos primero",
+  "hero.now": "Ahora",
+  "hero.caption": "Cada haz es un evento con fecha · más cerca, antes",
 
   "date.by": "antes del {date}",
   "date.passed": "Fecha pasada",

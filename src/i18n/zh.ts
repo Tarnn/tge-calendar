@@ -136,7 +136,9 @@ export const zh: Messages = {
   "agenda.marketGroupHint": "尚无官方日期，按市场认为大概率发行的时间排列",
   "event.trend": "30 天走势",
   "event.trendHint": "{date}发行的概率",
-  "hero.orbit": "即将到来的发行（按时间由近到远环绕）",
+  "hero.runway": "时间轴上即将到来的发行，按时间由近到远",
+  "hero.now": "现在",
+  "hero.caption": "每道光柱是一个已定日期的事件，越近越早",
 
   "date.by": "{date} 前",
   "date.passed": "日期已过",

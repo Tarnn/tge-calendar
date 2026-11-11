@@ -136,7 +136,9 @@ export const en = {
   "agenda.marketGroupHint": "No announced date — placed where traders price a launch as likely",
   "event.trend": "30-day trend",
   "event.trendHint": "Odds of a launch {date}",
-  "hero.orbit": "Upcoming launches in orbit, nearest first",
+  "hero.runway": "Upcoming launches along the timeline, soonest first",
+  "hero.now": "Now",
+  "hero.caption": "Each beam is a dated event · nearer is sooner",
 
   "date.by": "by {date}",
   "date.passed": "Date passed",
