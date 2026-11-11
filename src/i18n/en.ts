@@ -233,6 +233,7 @@ export const en = {
     "The curated dates were last checked {count} days ago, on {date}. Exchange listings and market odds are still live — confirm anything else with the project.",
   "footer.contribute": "Add or correct an event",
   "footer.rights": "Open source on GitHub.",
+  "scrollTop.label": "Back to top",
 } as const
 
 export type MessageKey = keyof typeof en

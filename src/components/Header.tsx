@@ -1,4 +1,4 @@
-import logoUrl from "@/assets/logo.png"
+import logoUrl from "@/assets/logo.svg"
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { Check, Languages, Monitor, Moon, Search, Sun } from "lucide-react"
 import { LOCALES, useI18n } from "@/i18n/context"
@@ -29,7 +29,7 @@ export function Header({ theme, onOpenSearch, onNavigate }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
-        <a href="#top" className="flex shrink-0 items-center gap-2.5 rounded-lg" aria-label={t("app.name")}>
+        <a id="brand" href="#top" className="flex shrink-0 items-center gap-2.5 rounded-lg" aria-label={t("app.name")}>
           <img src={logoUrl} alt="" width={28} height={28} className="size-7 rounded-lg" />
           <span className="font-display text-[17px] font-semibold tracking-tight">
             <span className="text-brand-ink">TGE</span> Calendar
