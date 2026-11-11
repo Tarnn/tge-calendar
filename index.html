@@ -3,9 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/crypto-calendar.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TGE Calendar - Track Token Generation Events</title>
-    <meta name="description" content="Stay ahead of the market with real-time token generation events. Track launches, analyze trends, and discover opportunities across all major blockchains." />
+    <link rel="apple-touch-icon" href="/crypto-calendar.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08080c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f4ef" media="(prefers-color-scheme: light)" />
+    <title>TGE Calendar — token launches, sales, airdrops and unlocks</title>
+    <meta
+      name="description"
+      content="A sourced calendar of token generation events, token sales, airdrops and unlocks, with live Polymarket odds for launches that have not been announced yet."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="TGE Calendar" />
+    <meta
+      property="og:description"
+      content="Every token launch, before it lists. Sourced dates plus live prediction-market odds."
+    />
+    <meta property="og:image" content="/crypto-calendar.png" />
+    <meta name="twitter:card" content="summary" />
+    <script>
+      // Apply the saved theme before first paint so the page never flashes the wrong one.
+      ;(function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem("tge:theme") || '"system"')
+          var dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+          document.documentElement.dataset.theme = dark ? "dark" : "light"
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark"
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

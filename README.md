@@ -1,289 +1,121 @@
-# TGE Calendar 🗓️
+# TGE Calendar
 
-A modern, responsive React web application for tracking **Token Generation Events (TGEs)** in real-time. Built for crypto enthusiasts, traders, and developers who need to stay ahead of the latest token launches and blockchain events.
+A calendar of token generation events, token sales, airdrops and unlocks — every
+date linked to its source — with live prediction-market odds for the launches
+nobody has announced yet.
 
-![TGE Calendar Preview](https://via.placeholder.com/800x400/1a1a2e/00d4ff?text=TGE+Calendar+Preview)
+React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no API keys.
 
-## 🌟 Key Features
+## What it does
 
-### 📅 Interactive Calendar
-- **Full-screen calendar view** with month, week, day, and year perspectives
-- **Real-time event visualization** with color-coded event markers
-- **Responsive design** optimized for desktop and mobile devices
-- **Smooth animations** powered by Framer Motion
+- **Month, agenda and radar views.** A month grid for dated events, an agenda
+  grouped by month, and a radar of projects ranked by how soon the market
+  expects them to launch.
+- **Honest dates.** Each event carries a confidence label (confirmed, expected,
+  tentative, market-implied) and how precisely its date is known. A launch
+  announced only as "Q4 2026" is listed as *date to be announced* for the months
+  it could fall in; it is never pinned to a made-up day.
+- **Live launch odds.** For tokens that do not trade yet, Polymarket's
+  pre-market contracts supply the odds of a launch by each deadline, the
+  implied fully diluted valuation one day after launch, and exchange-listing
+  odds.
+- **Countdown** to the next dated launch, in UTC and in the viewer's own timezone.
+- **Search** (`/` or `⌘K`), filters by type, confidence and chain, and a
+  watchlist kept in the browser.
+- **Export** to `.ics` (with a day-ahead reminder) or `.csv`, plus one-click
+  Google Calendar for a single event.
+- **Shareable links** — every event opens at `#event=<id>`.
+- **Market strip** with majors, total market cap, BTC dominance and the Fear & Greed index.
+- **Light, dark and system themes**; English, Spanish and Chinese.
+- **Works offline-ish.** The curated calendar is bundled. Live data is cached in
+  `localStorage`, so a failed request shows slightly stale odds, not a blank page.
 
-### 🔍 Advanced Filtering & Search
-- **Real-time search** across event names, tokens, and blockchains
-- **Date range filtering** with intuitive calendar picker
-- **Category and credibility filters** (verified, unverified, rumor)
-- **Live filter badges** showing active criteria
+## Data sources
 
-### 📊 Data Insights
-- **Live statistics dashboard** showing event counts and trends
-- **Top blockchain analysis** by event volume
-- **Weekly event forecasting** and predictions
-- **Market correlation indicators**
+| Data                                      | Source                                                        | Key |
+| ----------------------------------------- | ------------------------------------------------------------- | --- |
+| Scheduled events                          | Curated dataset in [`src/data/events.ts`](src/data/events.ts) | —   |
+| Launch odds, implied FDV, listing odds    | [Polymarket Gamma API](https://docs.polymarket.com/)          | no  |
+| Prices, market cap, dominance             | [CoinGecko public API](https://docs.coingecko.com/)           | no  |
+| Fear & Greed index                        | [alternative.me](https://alternative.me/crypto/fear-and-greed-index/) | no  |
 
-### 🔗 Polymarket Integration
-- **Automatic prediction market linking** for major TGE events
-- **Direct access to prediction markets** via integrated buttons
-- **Market sentiment indicators** where available
+All three live APIs are called straight from the browser. CoinGecko's keyless
+tier is rate-limited, so the ticker polls every three minutes and simply keeps
+its last values when a request is refused.
 
-### 💾 Smart Caching
-- **Local storage persistence** for offline viewing
-- **API rate limit handling** with intelligent retry logic
-- **Background polling** every 5 minutes for fresh data
-- **Error recovery** with cached data fallback
+### Adding or correcting an event
 
-## 🚀 Technology Stack
+Edit `src/data/events.ts` and open a pull request. Every entry needs:
 
-### Frontend Framework
-- **React 19** with TypeScript for type safety
-- **Vite** for lightning-fast development and building
-- **React Router** for client-side routing
+- `date` / `endDate` as `YYYY-MM-DD`, and a `precision`:
+  `day` (exact day, optional `timeUtc`), `range` (a sale or claim window), or
+  `window` (some day inside the span, not yet named);
+- a `status`: `confirmed` (announced by the project), `expected` (listed by
+  trackers) or `tentative` (sources conflict, or the team has not acknowledged it);
+- at least one `https` source link.
 
-### UI & Styling
-- **Shadcn UI** components with Radix UI primitives
-- **Tailwind CSS** for utility-first styling
-- **Framer Motion** for smooth animations
-- **Lucide React** for consistent iconography
+`npm test` validates the whole dataset (unique ids, real dates, labelled
+windows, sources present), so a malformed entry fails CI. Bump
+`DATASET_VERIFIED_ON` when you re-check the list.
 
-### State Management & Data
-- **TanStack Query (React Query)** for server state management
-- **Axios** for robust API communication
-- **Zod** for runtime type validation
-- **date-fns** for date manipulation
+## Getting started
 
-### Development & Quality
-- **ESLint** with TypeScript support for code quality
-- **Vitest** for fast unit testing
-- **Testing Library** for component testing
-- **Playwright** for E2E testing
+Requires Node 20.19+ (or 22.12+).
 
-## 📋 Prerequisites
+```bash
+npm install
+npm run dev        # http://localhost:5173
+```
 
-Before you begin, ensure you have the following installed:
+| Script              | What it does                                     |
+| ------------------- | ------------------------------------------------ |
+| `npm run dev`       | Dev server with hot reload                       |
+| `npm run build`     | Type-check, then build to `dist/`                |
+| `npm run preview`   | Serve the production build locally               |
+| `npm run lint`      | ESLint                                           |
+| `npm run typecheck` | TypeScript only                                  |
+| `npm test`          | Unit and component tests (Vitest, jsdom)         |
+| `npm run check`     | Lint, type-check, test and build — what CI runs  |
 
-- **Node.js 18+** - [Download here](https://nodejs.org/)
-- **npm 8+** or **yarn 1.22+**
-- **Git** for version control
+No environment variables are required. To receive issue reports by email
+instead of as GitHub issues, see [EMAILJS_SETUP.md](EMAILJS_SETUP.md).
 
-## 🛠️ Installation & Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Tarnn/tge-calendar.git
-   cd tge-calendar
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-
-   Copy the example environment file:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Add your API credentials to `.env.local`:
-   ```env
-   VITE_COINMARKETCAL_API_KEY=your_api_key_here
-   VITE_COINMARKETCAL_API_BASE_URL=https://developers.coinmarketcal.com
-   ```
-
-   > **Note**: Get your CoinMarketCal API key from [their developer portal](https://coinmarketcal.com/en/apikey).
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Open your browser**
-
-   Navigate to `http://localhost:5173` to see the application.
-
-## 🏗️ Project Structure
+## Project layout
 
 ```
 src/
-├── components/           # Reusable UI components
-│   ├── ui/              # Shadcn UI components
-│   ├── layout/          # Layout components (header, shell, etc.)
-│   └── providers/       # React context providers
-├── features/            # Feature-based modules
-│   └── calendar/        # Main calendar feature
-│       ├── api/         # API integration layer
-│       ├── components/  # Feature-specific components
-│       ├── hooks/       # Custom React hooks
-│       ├── lib/         # Utility functions
-│       ├── types/       # TypeScript type definitions
-│       └── tests/       # Feature-specific tests
-├── config/              # Application configuration
-├── hooks/               # Shared custom hooks
-└── lib/                 # Shared utilities
+├── data/events.ts        Curated calendar
+├── lib/
+│   ├── polymarket.ts     Gamma API client → one signal per project
+│   ├── pulse.ts          Prices, market cap, sentiment
+│   ├── merge.ts          Joins curated events with market signals
+│   ├── dates.ts          Calendar-day maths (timezone-safe)
+│   ├── filters.ts        Filtering and ranked search
+│   └── export.ts         iCalendar, CSV, Google Calendar links
+├── hooks/                Data fetching, theme, watchlist, URL hash, clock
+├── i18n/                 en / es / zh dictionaries and provider
+├── components/           Header, hero + three.js scene, the three views, dialogs
+└── App.tsx               Composition and app-level state
 ```
 
-## 🔌 API Integration
+Two things worth knowing before changing the date code:
 
-### CoinMarketCal API
-- **Endpoint**: `https://developers.coinmarketcal.com/v1/events`
-- **Authentication**: API key via header
-- **Rate Limits**: Handled with automatic retries and caching
-- **Data**: Real-time TGE events with metadata
+- Calendar days are plain `YYYY-MM-DD` strings. A launch announced for
+  "November 18" stays on the 18th in every timezone; only events with an
+  explicit UTC time are shifted into local time.
+- Market-implied entries are generated at runtime from Polymarket and are never
+  written into the curated dataset.
 
-### Polymarket API
-- **Endpoint**: `https://api.polymarket.com/markets`
-- **Integration**: Client-side filtering by event keywords
-- **Fallback**: Graceful degradation when markets unavailable
+## Deploying
 
-## 🧪 Testing
+It is a static site: run `npm run build` and serve `dist/`. On Vercel, Netlify
+or Cloudflare Pages, point the project at this repository with build command
+`npm run build` and output directory `dist`. Navigation uses the URL hash, so
+no rewrite rules are needed.
 
-Run the test suite:
+## Disclaimer
 
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run E2E tests (when implemented)
-npm run test:e2e
-```
-
-## 📱 Responsive Design
-
-The application is fully responsive and optimized for:
-
-- **Desktop** (1024px+): Full feature set with sidebar
-- **Tablet** (768px - 1023px): Condensed layout with collapsible navigation
-- **Mobile** (320px - 767px): Touch-optimized interface with bottom navigation
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
-
-1. **Connect your repository** to Vercel
-2. **Add environment variables** in Vercel dashboard:
-   - `VITE_COINMARKETCAL_API_KEY`
-   - `VITE_COINMARKETCAL_API_BASE_URL`
-3. **Deploy automatically** on every push to main
-
-### Manual Build
-
-```bash
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-## 🔧 Development
-
-### Available Scripts
-
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run test         # Run test suite
-npm run type-check   # Run TypeScript type checking
-```
-
-### Code Quality
-
-- **ESLint** for JavaScript/TypeScript linting
-- **TypeScript** for static type checking
-- **Prettier** for code formatting (via ESLint)
-- **Husky** for pre-commit hooks (planned)
-
-### Performance Optimizations
-
-- **Vite** for fast HMR and optimized builds
-- **Tree shaking** for minimal bundle sizes
-- **Code splitting** with lazy loading
-- **Image optimization** with modern formats
-- **Caching strategies** for API responses
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/your-feature`
-3. **Make your changes** and add tests
-4. **Run the test suite**: `npm test`
-5. **Submit a pull request** with a clear description
-
-### Code Standards
-
-- **TypeScript** for all new code
-- **ESLint** rules must pass
-- **Tests** required for new features
-- **Semantic commit messages** preferred
-
-## 📊 Performance Metrics
-
-**Current benchmarks** (as per PRD requirements):
-
-- **Load time**: <2 seconds initial load
-- **API response**: <500ms for cached requests
-- **Bundle size**: <200KB gzipped
-- **Lighthouse score**: >90 on all metrics
-
-## 🔒 Security
-
-- **API keys** stored securely in environment variables
-- **CORS** properly configured for production
-- **Input validation** with Zod schemas
-- **Rate limiting** handled gracefully
-- **No sensitive data** in client-side storage
-
-## 📈 Roadmap
-
-### Phase 1 (Current)
-- ✅ Basic calendar implementation
-- ✅ CoinMarketCal API integration
-- ✅ Responsive design
-- ✅ Search and filtering
-
-### Phase 2 (Next)
-- 🔄 Advanced analytics dashboard
-- 🔄 Push notifications for new events
-- 🔄 Event export functionality (iCal/CSV)
-- 🔄 User preferences and customization
-
-### Phase 3 (Future)
-- 🔄 Multi-calendar support
-- 🔄 Social features and sharing
-- 🔄 Advanced prediction market analytics
-- 🔄 Mobile app companion
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **CoinMarketCal** for providing comprehensive crypto event data
-- **Polymarket** for prediction market integration
-- **Shadcn** for beautiful, accessible UI components
-- **Vercel** for seamless deployment platform
-
-## 📞 Support
-
-For support, email hello@tge-calendar.com or join our [Discord community](https://discord.gg/tge-calendar).
-
----
-
-**Built with ❤️ for the crypto community**
+Informational only, not financial advice. Launch dates change without notice,
+and prediction-market prices are opinions, not announcements. Verify everything
+with the project's official channels, and never use a claim link that did not
+come from the project itself.
