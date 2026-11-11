@@ -19,7 +19,6 @@ export const en = {
   "ticker.dominance": "BTC dominance",
   "ticker.sentiment": "Fear & Greed",
 
-  "hero.eyebrow": "Live token launch tracker",
   "hero.titleA": "Every token launch,",
   "hero.titleB": "before it lists.",
   "hero.subtitle":

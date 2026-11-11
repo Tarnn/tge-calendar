@@ -20,7 +20,6 @@ export const es: Messages = {
   "ticker.dominance": "Dominancia BTC",
   "ticker.sentiment": "Miedo y codicia",
 
-  "hero.eyebrow": "Seguimiento en vivo de lanzamientos",
   "hero.titleA": "Cada lanzamiento de token,",
   "hero.titleB": "antes de que cotice.",
   "hero.subtitle":

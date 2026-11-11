@@ -416,17 +416,9 @@ export function Hero({
           variants={{ shown: { transition: { staggerChildren: 0.09 } } }}
           style={reduced ? undefined : { y: copyY }}
         >
-          <motion.p
-            variants={RISE}
-            className="pointer-events-auto inline-flex items-center gap-2 justify-self-start rounded-full border border-line bg-surface/70 px-3 py-1 text-xs font-medium text-ink-soft backdrop-blur [grid-area:eyebrow]"
-          >
-            <span aria-hidden className="size-1.5 animate-pulse-dot rounded-full bg-ok" />
-            {t("hero.eyebrow")}
-          </motion.p>
-
           <motion.h1
             variants={{ shown: { transition: { staggerChildren: 0.075 } } }}
-            className="pointer-events-auto mt-5 font-display text-[2.6rem] leading-[1.04] font-semibold tracking-tight text-balance [grid-area:title] sm:text-6xl lg:text-[4.25rem]"
+            className="pointer-events-auto font-display text-[2.6rem] leading-[1.04] font-semibold tracking-tight text-balance [grid-area:title] sm:text-6xl lg:text-[4.25rem]"
           >
             {t("hero.titleA")
               .split(" ")

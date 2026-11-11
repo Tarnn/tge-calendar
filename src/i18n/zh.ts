@@ -20,7 +20,6 @@ export const zh: Messages = {
   "ticker.dominance": "BTC 占比",
   "ticker.sentiment": "恐惧与贪婪",
 
-  "hero.eyebrow": "代币发行实时追踪",
   "hero.titleA": "每一次代币发行，",
   "hero.titleB": "抢在上线之前。",
   "hero.subtitle":
