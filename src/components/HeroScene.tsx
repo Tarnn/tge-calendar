@@ -113,6 +113,7 @@ const PALETTE: Record<ResolvedTheme, { a: string; b: string; c: string; opacity:
 /** Same hues as the event-type badges, one per theme. */
 const TYPE_COLOR: Record<EventType, Record<ResolvedTheme, string>> = {
   tge: { dark: "#ffb454", light: "#b45309" },
+  listing: { dark: "#2dd4bf", light: "#115e59" },
   sale: { dark: "#5cc8ff", light: "#0369a1" },
   airdrop: { dark: "#4ade80", light: "#0f6b33" },
   unlock: { dark: "#fb7185", light: "#be123c" },

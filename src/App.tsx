@@ -24,6 +24,7 @@ import { EMPTY_FILTERS, filterEvents, listChains } from "@/lib/filters"
 import { isRadarOnly } from "@/lib/merge"
 import { readJson, writeJson } from "@/lib/storage"
 import type { PaletteAction } from "@/components/CommandPalette"
+import { DatasetNotice } from "@/components/DatasetNotice"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Faq } from "@/components/Faq"
 import { Footer } from "@/components/Footer"
@@ -119,7 +120,9 @@ export default function App() {
   /** The hero counts down to the next launch that still has a moment ahead of it. */
   const headline = useMemo(() => {
     const ahead = upcomingDated.filter((event) => (countdownTarget(event)?.getTime() ?? 0) > now.getTime())
-    return ahead.find((event) => event.type === "tge") ?? ahead[0] ?? upcomingDated[0]
+    return (
+      ahead.find((event) => event.type === "tge" || event.type === "listing") ?? ahead[0] ?? upcomingDated[0]
+    )
   }, [upcomingDated, now])
 
   /** What starts next. Ranges already underway are on the calendar, not in this list. */
@@ -267,6 +270,7 @@ export default function App() {
               onExport={exportEvents}
               subscribeUrl={subscribeUrl}
             />
+            <DatasetNotice today={today} />
 
             <div id="view-panel" role="tabpanel" aria-labelledby={`tab-${view}`} className="mt-5 min-h-[32rem]">
               <AnimatePresence mode="wait" initial={false}>

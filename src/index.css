@@ -20,6 +20,7 @@
   --brand: #f7931a;
   --brand-ink: #8f4700;
   --tge: #8f4700;
+  --listing: #115e59;
   --sale: #0369a1;
   --airdrop: #0f6b33;
   --unlock: #be123c;
@@ -46,6 +47,7 @@
   --brand: #f7931a;
   --brand-ink: #ffb454;
   --tge: #ffb454;
+  --listing: #2dd4bf;
   --sale: #5cc8ff;
   --airdrop: #4ade80;
   --unlock: #fb7185;
@@ -78,6 +80,7 @@
   --color-brand-ink: var(--brand-ink);
   --color-on-brand: #1c1002;
   --color-tge: var(--tge);
+  --color-listing: var(--listing);
   --color-sale: var(--sale);
   --color-airdrop: var(--airdrop);
   --color-unlock: var(--unlock);

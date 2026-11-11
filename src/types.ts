@@ -1,5 +1,5 @@
 /** What kind of thing is happening on the date. */
-export type EventType = "tge" | "sale" | "airdrop" | "unlock" | "mainnet"
+export type EventType = "tge" | "listing" | "sale" | "airdrop" | "unlock" | "mainnet"
 
 /**
  * How much weight the date deserves.
@@ -96,7 +96,8 @@ export interface TgeEvent {
   /** Overrides the key used to match a Polymarket signal. */
   marketKey?: string
   signal?: MarketSignal
-  origin: "curated" | "polymarket"
+  /** Where the entry came from: the bundled dataset, an exchange announcement, or Polymarket. */
+  origin: "curated" | "exchange" | "polymarket"
 }
 
 export type ViewMode = "month" | "agenda" | "radar"

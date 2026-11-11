@@ -31,10 +31,29 @@ function preloadFonts(patterns: RegExp[]): Plugin {
   }
 }
 
+/**
+ * Link previews need absolute URLs: crawlers do not resolve a relative
+ * og:image. SITE_URL wins; on Vercel the project's production domain is used
+ * (so a custom domain is picked up by itself); otherwise the default deployment.
+ */
+function siteUrl(): string {
+  const production = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  const url = process.env.SITE_URL ?? (production ? `https://${production}` : "https://tge-calendar.vercel.app")
+  return url.replace(/\/+$/, "")
+}
+
+function absoluteSiteUrls(): Plugin {
+  return {
+    name: "absolute-site-urls",
+    transformIndexHtml: (html) => html.replaceAll("__SITE_URL__", siteUrl()),
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    absoluteSiteUrls(),
     // Body text and headlines; the monospace face is allowed to swap in.
     preloadFonts([/inter-latin-wght-normal-.*\.woff2$/, /space-grotesk-latin-wght-normal-.*\.woff2$/]),
   ],

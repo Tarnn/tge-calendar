@@ -6,6 +6,7 @@
   "rewrites": [
     { "source": "/api/signals.json", "destination": "/api/signals" },
     { "source": "/api/pulse.json", "destination": "/api/pulse" },
+    { "source": "/api/listings.json", "destination": "/api/listings" },
     { "source": "/calendar.ics", "destination": "/api/calendar" }
   ],
   "headers": [

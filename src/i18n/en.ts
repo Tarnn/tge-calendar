@@ -23,7 +23,7 @@ export const en = {
   "hero.titleA": "Every token launch,",
   "hero.titleB": "before it lists.",
   "hero.subtitle":
-    "Scheduled TGEs, sales, airdrops and unlocks with a source on every date — plus live prediction-market odds for the launches nobody has announced yet.",
+    "Scheduled TGEs, listings, sales, airdrops and unlocks with a source on every date — plus live prediction-market odds for the launches nobody has announced yet.",
   "hero.ctaCalendar": "Open the calendar",
   "hero.ctaRadar": "See launch odds",
   "stats.upcoming": "upcoming events",
@@ -63,6 +63,7 @@ export const en = {
   "export.empty": "Nothing to export with these filters",
 
   "type.tge": "TGE",
+  "type.listing": "Listing",
   "type.sale": "Token sale",
   "type.airdrop": "Airdrop",
   "type.unlock": "Unlock",
@@ -72,7 +73,7 @@ export const en = {
   "status.expected": "Expected",
   "status.tentative": "Tentative",
   "status.market": "Market-implied",
-  "statusHelp.confirmed": "Announced by the project itself.",
+  "statusHelp.confirmed": "Announced by the project itself, or by an exchange listing the token.",
   "statusHelp.expected": "Listed by trackers; the team has not confirmed it.",
   "statusHelp.tentative": "Sources conflict or the team has not acknowledged the date.",
   "statusHelp.market": "No announced date. Derived from Polymarket odds.",
@@ -186,10 +187,10 @@ export const en = {
     "A token generation event is the moment a project's token is created and becomes transferable. It often — but not always — coincides with the first exchange listing, an airdrop claim opening, or both.",
   "faq.q2": "Where do the dates come from?",
   "faq.a2":
-    "Scheduled events are curated from public trackers and project announcements, and every entry links to its source. Launch odds, implied valuations and listing odds are pulled live from Polymarket. Prices come from CoinGecko and the sentiment index from alternative.me.",
+    "Scheduled events are curated from public trackers and project announcements, and every entry links to its source. New exchange listings are read live from the exchanges' own announcements, with the trading time KuCoin states. Launch odds, implied valuations and listing odds are pulled live from Polymarket. Prices come from CoinGecko and the sentiment index from alternative.me.",
   "faq.q3": "What do the confidence labels mean?",
   "faq.a3":
-    "Confirmed means the project announced it. Expected means trackers list it but the team has not confirmed. Tentative means sources disagree or the team has been silent. Market-implied means there is no announced date at all and the timing is inferred from prediction-market prices.",
+    "Confirmed means the project announced it, or an exchange announced the listing. Expected means trackers list it but the team has not confirmed. Tentative means sources disagree or the team has been silent. Market-implied means there is no announced date at all and the timing is inferred from prediction-market prices.",
   "faq.q4": "How accurate is it?",
   "faq.a4":
     "Launch dates slip constantly. Treat everything here as a starting point and confirm with the project's official channels before acting. Never use a claim link that did not come from the project itself.",
@@ -225,7 +226,10 @@ export const en = {
   "footer.donate": "Donate (Solana)",
   "footer.copied": "Solana address copied",
   "footer.copyFailed": "Could not copy. Address: {address}",
-  "footer.data": "Curated dataset verified {date}. Live odds by Polymarket, prices by CoinGecko.",
+  "footer.data":
+    "Curated dataset verified {date}. Live listings from exchange announcements, odds by Polymarket, prices by CoinGecko.",
+  "data.stale":
+    "The curated dates were last checked {count} days ago, on {date}. Exchange listings and market odds are still live — confirm anything else with the project.",
   "footer.contribute": "Add or correct an event",
   "footer.rights": "Open source on GitHub.",
 } as const

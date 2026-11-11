@@ -15,6 +15,11 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
   tentative, market-implied) and how precisely its date is known. A launch
   announced only as "Q4 2026" is listed as *date to be announced* for the months
   it could fall in; it is never pinned to a made-up day.
+- **Live exchange listings.** New spot listings are read from the exchanges'
+  own announcements. KuCoin states the first trading time, so its listings land
+  on the calendar by themselves — confirming a launch the calendar already
+  tracks, or appearing as a listing of their own. Bitget and Binance, which
+  only say that a token will be listed, add a venue and never a date.
 - **Live launch odds.** For tokens that do not trade yet, Polymarket's
   pre-market contracts supply the odds of a launch by each deadline, the
   implied fully diluted valuation one day after launch, and exchange-listing
@@ -44,6 +49,7 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
 | Data                                      | Source                                                        | Key |
 | ----------------------------------------- | ------------------------------------------------------------- | --- |
 | Scheduled events                          | Curated dataset in [`src/data/events.ts`](src/data/events.ts) | —   |
+| New exchange listings                     | Announcement APIs of KuCoin (dated), Bitget and Binance (venue only) | no  |
 | Launch odds, implied FDV, listing odds    | [Polymarket Gamma API](https://docs.polymarket.com/)          | no  |
 | 30-day odds history                       | Polymarket CLOB `prices-history`                              | no  |
 | Prices, market cap, dominance             | [CoinGecko public API](https://docs.coingecko.com/)           | no  |
@@ -65,6 +71,27 @@ The app asks its own origin first and falls back to the upstream APIs:
 Either way the last good response is kept in `localStorage`, so a refused or
 failed request shows slightly stale numbers rather than an empty panel.
 
+Exchange listings are the exception to the fallback: the exchanges' APIs send
+no CORS headers, so **`/api/listings.json`** exists only where the edge
+functions do. On a plain static host the calendar simply shows the curated
+events without them.
+
+### How exchange listings are merged
+
+- A notice for a project the calendar already tracks, on the tracked day or
+  inside its undated window, **confirms** that event: the day and hour are
+  set, the venue and the announcement are added.
+- Any other notice becomes an event of its own — a `tge` when the exchange
+  bills it as a world premiere, otherwise a `listing` (one more venue for a
+  token that may already trade).
+- Exchanges do not retract an announcement when a listing slips: Binance left
+  its "Will List PREDICT" notice up after postponing that listing in October
+  2026. So a notice **never overrules the curated dataset on a later date** — if
+  the dataset was verified after the day the exchange named and still shows the
+  launch as ahead or undated, the notice is ignored. A notice that another
+  announcement in the same feed walks back ("postponement of …") is dropped too.
+- Listings stay on the calendar for 21 days after trading opens.
+
 ### Adding or correcting an event
 
 Edit `src/data/events.ts` and open a pull request. Every entry needs:
@@ -78,7 +105,26 @@ Edit `src/data/events.ts` and open a pull request. Every entry needs:
 
 `npm test` validates the whole dataset (unique ids, real dates, labelled
 windows, sources present), so a malformed entry fails CI. Bump
-`DATASET_VERIFIED_ON` when you re-check the list.
+`DATASET_VERIFIED_ON` when you re-check the list: it is shown in the footer,
+it decides which exchange notices are too old to trust over the dataset, and
+once it is more than 21 days old the page tells visitors the curated dates
+have not been re-checked recently.
+
+### Keeping the dataset current
+
+The live sources look after themselves; the curated list needs a pass roughly
+once a week. A pass means:
+
+1. Re-check every event dated in the next six weeks against its sources —
+   has the date moved, been confirmed, or been cancelled?
+2. Look for launches the list is missing: exchange listing announcements,
+   the monthly tracker round-ups already cited in the file, and Polymarket
+   markets that have flipped to near-certain.
+3. Record what the sources say, not what seems likely: a date nobody has
+   named stays a `window`, and a date the team has not acknowledged stays
+   `tentative`. Never delete a past event; correct it.
+4. Bump `DATASET_VERIFIED_ON`, run `npm run check`, and open a pull request
+   that lists each change with its source.
 
 ## Getting started
 
@@ -102,6 +148,11 @@ npm run dev        # http://localhost:5173
 No environment variables are required. To receive issue reports by email
 instead of as GitHub issues, see [EMAILJS_SETUP.md](EMAILJS_SETUP.md).
 
+Link previews (`og:image`, canonical URL) need an absolute address. On Vercel
+the project's production domain is used automatically, so a custom domain is
+picked up by itself; anywhere else set `SITE_URL` at build time
+(`SITE_URL=https://example.com npm run build`).
+
 ## Project layout
 
 ```
@@ -110,7 +161,9 @@ src/
 ├── lib/
 │   ├── polymarket.ts     Gamma API client → one signal per project
 │   ├── pulse.ts          Prices, market cap, sentiment
-│   ├── merge.ts          Joins curated events with market signals
+│   ├── listings.ts       Exchange announcement parsers (KuCoin, Bitget, Binance)
+│   ├── listingEvents.ts  Folds exchange listings into the calendar
+│   ├── merge.ts          Joins curated events, listings and market signals
 │   ├── dates.ts          Calendar-day maths (timezone-safe)
 │   ├── filters.ts        Filtering and ranked search
 │   └── export.ts         iCalendar, CSV, Google Calendar links
@@ -119,7 +172,7 @@ src/
 ├── i18n/                 en / es / zh dictionaries and provider
 ├── components/           Header, hero + three.js scene, the three views, dialogs
 └── App.tsx               Composition and app-level state
-api/                      Vercel edge functions: signals, pulse, calendar feed
+api/                      Vercel edge functions: signals, pulse, listings, calendar feed
 vercel.json               Rewrites, cache and security headers
 ```
 
@@ -144,14 +197,15 @@ Import the repository at [vercel.com/new](https://vercel.com/new) and deploy —
 configure. Every push to `main` then deploys to production and every pull
 request gets its own preview URL.
 
-On Vercel you also get the three edge routes described above
-(`/api/signals.json`, `/api/pulse.json`, `/calendar.ics`), long-lived caching
+On Vercel you also get the edge routes described above (`/api/signals.json`,
+`/api/pulse.json`, `/api/listings.json`, `/calendar.ics`), long-lived caching
 for hashed assets, and a small set of security headers.
 
 ### Any static host
 
 Run `npm run build` and serve `dist/`. The app detects that the API routes are
-absent and calls the upstream APIs directly. Navigation uses the URL hash, so
+absent and calls the upstream APIs directly (live exchange listings are the one
+thing that needs the edge functions). Navigation uses the URL hash, so
 no rewrite rules are needed.
 
 ## Disclaimer

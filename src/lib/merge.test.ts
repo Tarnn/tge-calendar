@@ -23,6 +23,42 @@ function curated(overrides: Partial<TgeEvent> & Pick<TgeEvent, "id" | "project">
 
 const TODAY = "2026-11-11"
 
+describe("mergeEvents with exchange listings", () => {
+  const listings = {
+    listings: [
+      {
+        id: "kucoin-1",
+        project: "Matrix",
+        symbol: "MTX",
+        tradingAt: "2026-11-12T09:00:00Z",
+        premiere: false,
+        venue: "KuCoin",
+        link: { label: "KuCoin — listing announcement", url: "https://www.kucoin.com/announcement/1" },
+      },
+    ],
+    mentions: [],
+  }
+
+  it("adds the listing and lets it stand in for the project's market-only entry", () => {
+    const likelyBy = { date: "2026-12-31", probability: 0.9 }
+    const merged = mergeEvents(
+      [],
+      [signal({ key: "matrix", project: "Matrix", launch: [likelyBy], likelyBy })],
+      TODAY,
+      listings,
+    )
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({ id: "listing-kucoin-1", type: "listing", status: "confirmed", origin: "exchange" })
+    expect(merged[0]?.signal?.key).toBe("matrix")
+  })
+
+  it("is unchanged when no listings are passed", () => {
+    const events = [curated({ id: "a", project: "A" })]
+    expect(mergeEvents(events, [], TODAY)).toEqual(events)
+    expect(mergeEvents(events, [], TODAY, { listings: [], mentions: [] })).toEqual(events)
+  })
+})
+
 describe("mergeEvents", () => {
   it("attaches a signal to the curated event for the same project", () => {
     const merged = mergeEvents(
