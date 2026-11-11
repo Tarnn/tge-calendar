@@ -23,18 +23,20 @@ import { buildCsv, buildIcs, downloadFile } from "@/lib/export"
 import { EMPTY_FILTERS, filterEvents, listChains } from "@/lib/filters"
 import { isRadarOnly } from "@/lib/merge"
 import { readJson, writeJson } from "@/lib/storage"
-import { AgendaView } from "@/components/AgendaView"
 import type { PaletteAction } from "@/components/CommandPalette"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Faq } from "@/components/Faq"
 import { Footer } from "@/components/Footer"
 import { Header } from "@/components/Header"
 import { Hero, type HeroStats } from "@/components/Hero"
 import { MarketTicker } from "@/components/MarketTicker"
 import { MonthView } from "@/components/MonthView"
-import { RadarView } from "@/components/RadarView"
 import { Toolbar } from "@/components/Toolbar"
 
-// Overlays are fetched the first time they are needed, keeping them out of the initial bundle.
+// The month grid is the default view and ships in the main bundle; the other
+// two views and the overlays are fetched the first time they are needed.
+const AgendaView = lazy(() => import("@/components/AgendaView").then((m) => ({ default: m.AgendaView })))
+const RadarView = lazy(() => import("@/components/RadarView").then((m) => ({ default: m.RadarView })))
 const EventDialog = lazy(() => import("@/components/EventDialog").then((m) => ({ default: m.EventDialog })))
 const CommandPalette = lazy(() => import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })))
 const FeedbackDialog = lazy(() => import("@/components/FeedbackDialog").then((m) => ({ default: m.FeedbackDialog })))
@@ -71,7 +73,7 @@ export default function App() {
   const now = useNow(30_000)
   const today = localDayKey(now)
 
-  const { events, signals, live } = useEvents(today)
+  const { events, signals, live } = useEvents(today, now)
   const { pulse, isLoading: pulseLoading } = useMarketPulse()
 
   const [view, setViewState] = useState<ViewMode>(initialView)
@@ -94,6 +96,10 @@ export default function App() {
   const dialogNeeded = useLatch(eventId !== null)
   const paletteNeeded = useLatch(paletteOpen)
   const feedbackNeeded = useLatch(feedbackOpen)
+  /** Calendar apps subscribe over webcal://; only offered when a live API is serving the feed. */
+  const subscribeUrl = live.hasApi
+    ? `webcal://${window.location.host}${import.meta.env.BASE_URL}calendar.ics`
+    : undefined
   const resultCount = view === "radar" ? filtered.filter((event) => event.signal).length : scheduled.length
 
   /** Dated, announced events that have not happened yet, soonest first. */
@@ -255,6 +261,7 @@ export default function App() {
               chains={chains}
               resultCount={resultCount}
               onExport={exportEvents}
+              subscribeUrl={subscribeUrl}
             />
 
             <div id="view-panel" role="tabpanel" aria-labelledby={`tab-${view}`} className="mt-5 min-h-[32rem]">
@@ -266,39 +273,43 @@ export default function App() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
-                  {view === "month" && (
-                    <MonthView
-                      events={scheduled}
-                      month={month}
-                      onMonthChange={setMonth}
-                      today={today}
-                      selectedDay={selectedDay}
-                      onSelectDay={setSelectedDay}
-                      onOpenEvent={openEvent}
-                      isWatched={watchlist.has}
-                      onToggleWatch={toggleWatch}
-                    />
-                  )}
-                  {view === "agenda" && (
-                    <AgendaView
-                      events={scheduled}
-                      now={now}
-                      today={today}
-                      onOpenEvent={openEvent}
-                      isWatched={watchlist.has}
-                      onToggleWatch={toggleWatch}
-                    />
-                  )}
-                  {view === "radar" && (
-                    <RadarView
-                      events={filtered}
-                      live={live}
-                      today={today}
-                      onOpenEvent={openEvent}
-                      isWatched={watchlist.has}
-                      onToggleWatch={toggleWatch}
-                    />
-                  )}
+                  <ErrorBoundary resetKey={view}>
+                    <Suspense fallback={<div className="skeleton h-96 rounded-3xl" />}>
+                      {view === "month" && (
+                        <MonthView
+                          events={scheduled}
+                          month={month}
+                          onMonthChange={setMonth}
+                          today={today}
+                          selectedDay={selectedDay}
+                          onSelectDay={setSelectedDay}
+                          onOpenEvent={openEvent}
+                          isWatched={watchlist.has}
+                          onToggleWatch={toggleWatch}
+                        />
+                      )}
+                      {view === "agenda" && (
+                        <AgendaView
+                          events={scheduled}
+                          now={now}
+                          today={today}
+                          onOpenEvent={openEvent}
+                          isWatched={watchlist.has}
+                          onToggleWatch={toggleWatch}
+                        />
+                      )}
+                      {view === "radar" && (
+                        <RadarView
+                          events={filtered}
+                          live={live}
+                          today={today}
+                          onOpenEvent={openEvent}
+                          isWatched={watchlist.has}
+                          onToggleWatch={toggleWatch}
+                        />
+                      )}
+                    </Suspense>
+                  </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             </div>

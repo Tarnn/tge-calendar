@@ -84,6 +84,9 @@ function stubFetch({ polymarketDown = false } = {}) {
   return fetchMock
 }
 
+/** Radar and agenda are code-split, so their first render waits on a dynamic import. */
+const LAZY = { timeout: 5000 }
+
 function renderApp() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   return render(
@@ -154,7 +157,7 @@ describe("App", () => {
     renderApp()
 
     await user.click(screen.getByRole("tab", { name: "Radar" }))
-    const predict = (await screen.findByRole("button", { name: "Predict.fun" })).closest("li") as HTMLElement
+    const predict = (await screen.findByRole("button", { name: "Predict.fun" }, LAZY)).closest("li") as HTMLElement
     expect(within(predict).getByText("Likely by Nov 30")).toBeInTheDocument()
     expect(within(predict).getByText("69%")).toBeInTheDocument()
     // Curated status rides along with the market signal.
@@ -171,7 +174,7 @@ describe("App", () => {
 
     expect(within(screen.getByRole("grid")).getByRole("button", { name: "KDX" })).toBeInTheDocument()
     await user.click(screen.getByRole("tab", { name: "Radar" }))
-    await waitFor(() => expect(screen.getAllByText(/Could not reach Polymarket/).length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getAllByText(/Could not reach Polymarket/).length).toBeGreaterThan(0), LAZY)
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument()
   })
 
@@ -190,13 +193,59 @@ describe("App", () => {
     expect(within(grid).getByRole("button", { name: "KDX" })).toBeInTheDocument()
   })
 
+  it("narrows the calendar with the quick filter", async () => {
+    stubFetch()
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.type(screen.getByRole("searchbox", { name: /filter by name/i }), "monad")
+    const grid = screen.getByRole("grid")
+    expect(within(grid).getByRole("button", { name: "MON" })).toBeInTheDocument()
+    expect(within(grid).queryByRole("button", { name: "KDX" })).not.toBeInTheDocument()
+    expect(screen.getByText("1 events")).toBeInTheDocument()
+  })
+
+  it("uses the cached API when the host provides one", async () => {
+    const fetchMock = stubFetch()
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith("/api/signals.json")) {
+        return json({
+          generatedAt: NOW.getTime(),
+          live: true,
+          signals: [
+            {
+              key: "opensea",
+              project: "Opensea",
+              volumeUsd: 1_600_000,
+              launch: [{ date: "2027-06-30", probability: 0.62, change1d: 0.04 }],
+              fdv: [],
+              listings: [],
+              links: [],
+              likelyBy: { date: "2027-06-30", probability: 0.62, change1d: 0.04 },
+            },
+          ],
+        })
+      }
+      return json({}, 404)
+    })
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole("tab", { name: "Radar" }))
+    const card = (await screen.findByRole("button", { name: "Opensea" }, LAZY)).closest("li") as HTMLElement
+    expect(within(card).getByText("+4 pts in 24h")).toBeInTheDocument()
+    // Polymarket itself was never contacted from the browser.
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("polymarket.com"))).toBe(false)
+  })
+
   it("remembers the watchlist", async () => {
     stubFetch()
     const user = userEvent.setup()
     renderApp()
 
     await user.click(screen.getByRole("tab", { name: "Agenda" }))
-    const row = (await screen.findByText("LayerZero")).closest("li") as HTMLElement
+    const row = (await screen.findByText("LayerZero", undefined, LAZY)).closest("li") as HTMLElement
     await user.click(within(row).getByRole("button", { name: "Watch" }))
     expect(JSON.parse(window.localStorage.getItem("tge:watchlist") ?? "[]")).toEqual(["layerzero-unlock-nov"])
 

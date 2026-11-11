@@ -1,4 +1,4 @@
-import type { TgeEvent } from "@/types"
+import type { TgeEvent } from "../types.js"
 
 /**
  * Calendar days are handled as plain "YYYY-MM-DD" strings so that an event

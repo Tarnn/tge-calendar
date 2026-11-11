@@ -115,6 +115,15 @@ export const zh: Messages = {
   "radar.updated": "更新于 {time}",
   "radar.cached": "显示 {time} 保存的赔率",
 
+  "radar.sortMovers": "变动最大",
+  "radar.move": "24 小时 {points} 个百分点",
+  "filter.search": "按名称、代码、公链筛选…",
+  "export.subscribe": "在日历应用中订阅",
+  "export.subscribeHint": "自动保持更新",
+  "error.title": "这里出了点问题",
+  "error.body": "页面的这一部分遇到了意外错误，其余部分仍可正常使用。",
+  "error.retry": "重试",
+
   "date.by": "{date} 前",
   "date.passed": "日期已过",
   "date.localTime": "当地时间 {time}",

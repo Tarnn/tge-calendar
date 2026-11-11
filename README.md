@@ -10,7 +10,7 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
 
 - **Month, agenda and radar views.** A month grid for dated events, an agenda
   grouped by month, and a radar of projects ranked by how soon the market
-  expects them to launch.
+  expects them to launch — or by the biggest 24-hour swing in their odds.
 - **Honest dates.** Each event carries a confidence label (confirmed, expected,
   tentative, market-implied) and how precisely its date is known. A launch
   announced only as "Q4 2026" is listed as *date to be announced* for the months
@@ -20,10 +20,11 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
   implied fully diluted valuation one day after launch, and exchange-listing
   odds.
 - **Countdown** to the next dated launch, in UTC and in the viewer's own timezone.
-- **Search** (`/` or `⌘K`), filters by type, confidence and chain, and a
-  watchlist kept in the browser.
-- **Export** to `.ics` (with a day-ahead reminder) or `.csv`, plus one-click
-  Google Calendar for a single event.
+- **Search** (`/` or `⌘K`), a quick text filter, filters by type, confidence
+  and chain, and a watchlist kept in the browser.
+- **Export** to `.ics` (with a day-ahead reminder) or `.csv`, one-click Google
+  Calendar for a single event, and — when deployed on Vercel — a calendar feed
+  at `/calendar.ics` that calendar apps can subscribe to and that updates itself.
 - **Shareable links** — every event opens at `#event=<id>`.
 - **Market strip** with majors, total market cap, BTC dominance and the Fear & Greed index.
 - **Light, dark and system themes**; English, Spanish and Chinese.
@@ -39,9 +40,21 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · three.js. No backend, no A
 | Prices, market cap, dominance             | [CoinGecko public API](https://docs.coingecko.com/)           | no  |
 | Fear & Greed index                        | [alternative.me](https://alternative.me/crypto/fear-and-greed-index/) | no  |
 
-All three live APIs are called straight from the browser. CoinGecko's keyless
-tier is rate-limited, so the ticker polls every three minutes and simply keeps
-its last values when a request is refused.
+### How live data reaches the browser
+
+The app asks its own origin first and falls back to the upstream APIs:
+
+1. **`/api/signals.json` and `/api/pulse.json`** — on Vercel these are edge
+   functions (`api/`) that fetch upstream once and let the CDN answer everyone
+   for a few minutes. The Polymarket payload shrinks from roughly 4 MB of raw
+   market data to about 90 kB (11 kB gzipped), and visitors share one CoinGecko
+   call instead of each spending their own rate limit.
+2. **Direct calls** — if those routes are missing (`npm run dev`, or any plain
+   static host) the browser calls Polymarket, CoinGecko and alternative.me
+   itself. Nothing is lost except the caching.
+
+Either way the last good response is kept in `localStorage`, so a refused or
+failed request shows slightly stale numbers rather than an empty panel.
 
 ### Adding or correcting an event
 
@@ -60,7 +73,7 @@ windows, sources present), so a malformed entry fails CI. Bump
 
 ## Getting started
 
-Requires Node 20.19+ (or 22.12+).
+Requires Node 22.
 
 ```bash
 npm install
@@ -92,10 +105,13 @@ src/
 │   ├── dates.ts          Calendar-day maths (timezone-safe)
 │   ├── filters.ts        Filtering and ranked search
 │   └── export.ts         iCalendar, CSV, Google Calendar links
+│   ├── api.ts            Same-origin API first, upstream fallback
 ├── hooks/                Data fetching, theme, watchlist, URL hash, clock
 ├── i18n/                 en / es / zh dictionaries and provider
 ├── components/           Header, hero + three.js scene, the three views, dialogs
 └── App.tsx               Composition and app-level state
+api/                      Vercel edge functions: signals, pulse, calendar feed
+vercel.json               Rewrites, cache and security headers
 ```
 
 Two things worth knowing before changing the date code:
@@ -105,12 +121,28 @@ Two things worth knowing before changing the date code:
   explicit UTC time are shifted into local time.
 - Market-implied entries are generated at runtime from Polymarket and are never
   written into the curated dataset.
+- Modules imported by the functions in `api/` are compiled one file at a time
+  as native ES modules, so their relative imports end in `.js` (TypeScript,
+  Vite and Vitest resolve that to the `.ts` source). `npm run check` cannot
+  detect a missing extension there; `npx vercel build` can.
 
 ## Deploying
 
-It is a static site: run `npm run build` and serve `dist/`. On Vercel, Netlify
-or Cloudflare Pages, point the project at this repository with build command
-`npm run build` and output directory `dist`. Navigation uses the URL hash, so
+### Vercel (recommended)
+
+Import the repository at [vercel.com/new](https://vercel.com/new) and deploy —
+`vercel.json` already carries the build settings, so there is nothing to
+configure. Every push to `main` then deploys to production and every pull
+request gets its own preview URL.
+
+On Vercel you also get the three edge routes described above
+(`/api/signals.json`, `/api/pulse.json`, `/calendar.ics`), long-lived caching
+for hashed assets, and a small set of security headers.
+
+### Any static host
+
+Run `npm run build` and serve `dist/`. The app detects that the API routes are
+absent and calls the upstream APIs directly. Navigation uses the URL hash, so
 no rewrite rules are needed.
 
 ## Disclaimer

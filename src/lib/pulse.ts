@@ -1,5 +1,5 @@
 import * as z from "zod/mini"
-import type { MarketPulse, PriceQuote } from "@/types"
+import type { MarketPulse, PriceQuote } from "../types.js"
 
 /** Majors shown in the ticker. One CoinGecko call covers all of them. */
 const TICKER_IDS = ["bitcoin", "ethereum", "solana", "binancecoin", "hyperliquid"]

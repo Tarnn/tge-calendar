@@ -240,7 +240,9 @@ export default function HeroScene({ theme }: { theme: ResolvedTheme }) {
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const pointer = { x: 0, y: 0 }
-    let elapsed = reducedMotion ? 4.2 : 0
+    // Start on a three-quarter view of the coin. With reduced motion this is
+    // also the only frame ever drawn, so it must not be edge-on.
+    let elapsed = 1.4
     let last = performance.now()
     let frame = 0
     let visible = true

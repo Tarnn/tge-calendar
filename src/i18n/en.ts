@@ -115,6 +115,15 @@ export const en = {
   "radar.updated": "Updated {time}",
   "radar.cached": "Showing saved odds from {time}",
 
+  "radar.sortMovers": "Biggest movers",
+  "radar.move": "{points} pts in 24h",
+  "filter.search": "Filter by name, ticker, chain…",
+  "export.subscribe": "Subscribe in a calendar app",
+  "export.subscribeHint": "Keeps itself up to date",
+  "error.title": "Something went wrong here",
+  "error.body": "This part of the page hit an unexpected error. The rest still works.",
+  "error.retry": "Try again",
+
   "date.by": "by {date}",
   "date.passed": "Date passed",
   "date.localTime": "{time} your time",
