@@ -256,6 +256,16 @@ function Magnetic({ children, className }: { children: ReactNode; className?: st
   )
 }
 
+/** "2d 4h", "5h 41m" or "12m" until an event, or nothing once it has begun. */
+function timeLeft(event: TgeEvent, now: Date): string | undefined {
+  const target = countdownTarget(event)
+  if (!target) return undefined
+  const { totalMs, days, hours, minutes } = countdownParts(target, now)
+  if (totalMs <= 0) return undefined
+  if (days > 0) return `${days}d ${hours}h`
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
 const EASE = [0.16, 1, 0.3, 1] as const
 /** Each word climbs out from behind the line below it. */
 const WORD = {
@@ -297,8 +307,10 @@ export function Hero({
   const [ready, setReady] = useState(false)
   const reduced = useReducedMotion()
   const wide = useMediaQuery("(min-width: 1024px)")
-  // The runway only needs to know the time to within a few minutes.
+  // The runway only needs to know the time to within a few minutes; the
+  // countdown on the lead launch's label, to the minute.
   const now = useNow(600_000)
+  const minute = useNow(60_000)
 
   // Scrolling lifts the camera over the runway (inside the scene) while the
   // copy drifts up a little faster than the page and the scene fades out.
@@ -323,9 +335,10 @@ export function Hero({
           status: event.status,
           days: daysUntil(event, now),
           lead: event.id === headline?.id,
+          note: event.id === headline?.id ? timeLeft(event, minute) : undefined,
         }))
         .sort((a, b) => a.days - b.days),
-    [launches, wide, now, headline, i18n, t],
+    [launches, wide, now, minute, headline, i18n, t],
   )
 
   const marks = useMemo<RunwayMark[]>(() => {
@@ -434,7 +447,7 @@ export function Hero({
           {allowed && (
             <div
               ref={anchorRef}
-              className="relative mt-4 h-60 [grid-area:scene] sm:h-72 lg:mt-0 lg:h-auto lg:min-h-[30rem]"
+              className="relative mt-4 h-60 [grid-area:scene] sm:h-72 md:h-80 lg:mt-0 lg:h-auto lg:min-h-[30rem]"
             >
               {/* What the picture means, for anyone who wonders. */}
               <motion.p

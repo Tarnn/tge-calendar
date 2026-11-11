@@ -6,10 +6,11 @@ import {
   CanvasTexture,
   Color,
   ColorManagement,
-  CylinderGeometry,
+  DoubleSide,
   Group,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
+  LatheGeometry,
   LinearSRGBColorSpace,
   Mesh,
   MeshBasicMaterial,
@@ -19,6 +20,7 @@ import {
   Points,
   Scene,
   ShaderMaterial,
+  Vector2,
   Vector3,
   Vector4,
   WebGLRenderer,
@@ -70,6 +72,8 @@ export interface Beacon {
   days: number
   /** The launch the hero counts down to. */
   lead: boolean
+  /** Extra words on the label, e.g. the time left for the lead launch. */
+  note?: string
 }
 
 export interface RunwayMark {
@@ -97,9 +101,10 @@ interface Palette {
   glow: number
   additive: boolean
   sun: string
-  veilA: string
-  veilB: string
-  aurora: number
+  veil: string
+  haze: number
+  /** What a polished coin reflects: sky, horizon, ground and the glow between them. */
+  env: { sky: string; horizon: string; ground: string; glow: string }
   dust: string
   ink: string
   inkAlpha: number
@@ -108,8 +113,6 @@ interface Palette {
   /** Width of the soft light round a beam: generous in the dark, tight on a light page. */
   halo: number
   sky: number
-  /** Unlit share of a coin's face: higher reads as a solid disc on a light page. */
-  shade: number
 }
 
 const PALETTE: Record<ResolvedTheme, Palette> = {
@@ -120,9 +123,9 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     glow: 1,
     additive: true,
     sun: "#ff9a3d",
-    veilA: "#7c5cff",
-    veilB: "#2dd4bf",
-    aurora: 0.85,
+    veil: "#6f63ff",
+    haze: 0.2,
+    env: { sky: "#1c2140", horizon: "#5a4252", ground: "#06060a", glow: "#ffa04a" },
     dust: "#ffd9a8",
     ink: "#f3f3f5",
     inkAlpha: 0.55,
@@ -130,7 +133,6 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     beam: 1,
     halo: 1,
     sky: 1,
-    shade: 0.22,
   },
   light: {
     line: "#3d3829",
@@ -139,9 +141,9 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     glow: 0.7,
     additive: false,
     sun: "#ffb561",
-    veilA: "#f59e0b",
-    veilB: "#fb7185",
-    aurora: 0.3,
+    veil: "#f0a35e",
+    haze: 0.16,
+    env: { sky: "#f4f6ff", horizon: "#ffe6cf", ground: "#8a8274", glow: "#ffc27a" },
     dust: "#9a5a12",
     ink: "#17150f",
     inkAlpha: 0.5,
@@ -149,7 +151,6 @@ const PALETTE: Record<ResolvedTheme, Palette> = {
     beam: 0.9,
     halo: 0.4,
     sky: 0.7,
-    shade: 0.6,
   },
 }
 
@@ -314,6 +315,7 @@ export default function HeroScene({
       uAccent: { value: new Color() },
       uMouse: { value: new Vector3(0, 0, 0) },
       uCount: { value: 0 },
+      uLead: { value: -1 },
       uBeacon: { value: Array.from({ length: MAX_BEACONS }, () => new Vector4()) },
       uBeaconColor: { value: Array.from({ length: MAX_BEACONS }, () => new Color()) },
     }
@@ -338,14 +340,12 @@ export default function HeroScene({
     /** Share of the sky quad that hangs below the horizon, where the glow spills onto the ground. */
     const SKY_HORIZON = 0.22
     const skyUniforms = {
-      uTime: time,
       uOpacity: { value: 1 },
       uIntro: intro,
-      uAurora: { value: 0.5 },
+      uHaze: { value: 0.2 },
       uHorizon: { value: SKY_HORIZON },
       uSun: { value: new Color() },
-      uVeilA: { value: new Color() },
-      uVeilB: { value: new Color() },
+      uVeil: { value: new Color() },
     }
     const skyMaterial = new ShaderMaterial({
       uniforms: skyUniforms,
@@ -457,7 +457,23 @@ export default function HeroScene({
     beams.renderOrder = 3
     beams.frustumCulled = false
 
-    const coin = new CylinderGeometry(0.5, 0.5, 0.1, 36)
+    // A coin turned on a lathe: a recessed face inside a raised rim, with a
+    // bevelled edge, so that it catches the light the way struck metal does.
+    const coin = new LatheGeometry(
+      [
+        [0, -0.032],
+        [0.34, -0.032],
+        [0.372, -0.05],
+        [0.458, -0.05],
+        [0.5, -0.024],
+        [0.5, 0.024],
+        [0.458, 0.05],
+        [0.372, 0.05],
+        [0.34, 0.032],
+        [0, 0.032],
+      ].map(([radius, height]) => new Vector2(radius, height)),
+      56,
+    )
     coin.rotateX(Math.PI / 2)
     const tokenGeometry = new InstancedBufferGeometry()
     tokenGeometry.index = coin.index
@@ -476,21 +492,25 @@ export default function HeroScene({
       uCam: cameraPosition,
       uGain: gain,
       uOpacity: { value: 1 },
-      uShade: { value: 0.22 },
+      uEnvSky: { value: new Color() },
+      uEnvHorizon: { value: new Color() },
+      uEnvGround: { value: new Color() },
+      uEnvGlow: { value: new Color() },
     }
+    // The one solid in the scene: it sorts its own faces with the depth buffer.
     const tokenMaterial = new ShaderMaterial({
       uniforms: tokenUniforms,
       vertexShader: TOKEN_VERTEX,
       fragmentShader: TOKEN_FRAGMENT,
       transparent: true,
-      depthTest: false,
-      depthWrite: false,
+      side: DoubleSide,
     })
     const tokens = new Mesh(tokenGeometry, tokenMaterial)
     tokens.renderOrder = 4
     tokens.frustumCulled = false
 
     const sparkTotal = MAX_BEACONS * SPARKS_PER_BEAM
+    const sparkRandom = Float32Array.from({ length: sparkTotal * 4 }, () => Math.random())
     const sparkBase = new BufferAttribute(new Float32Array(sparkTotal * 3), 3)
     const sparkColor = new BufferAttribute(new Float32Array(sparkTotal * 3), 3)
     const sparkSeed = new BufferAttribute(new Float32Array(sparkTotal * 4), 4)
@@ -567,8 +587,6 @@ export default function HeroScene({
       // the beams fan out to its right. Stacked under the headline (phones,
       // tablets), it is centred with beams on both sides.
       const narrow = boxWidth > width * 0.7
-      // Behind the headline, the curtains of light are kept faint.
-      skyUniforms.uAurora.value = palette.aurora * (narrow ? 0.45 : 1)
       vanishX = left + boxWidth * (narrow ? 0.5 : 0.1)
       vanishY = boxTop + boxHeight * (narrow ? 0.5 : 0.46)
       const gap = Math.max(44, boxWidth * (narrow ? 0.1 : 0.14))
@@ -613,7 +631,15 @@ export default function HeroScene({
           const at = i * SPARKS_PER_BEAM + s
           sparkBase.setXYZ(at, place.x, 0, place.z)
           sparkColor.setXYZ(at, color.r, color.g, color.b)
-          sparkSeed.setXYZW(at, Math.random(), Math.random(), Math.random(), place.height * (0.5 + Math.random() * 0.45))
+          // The same spark keeps the same path however often the scene is laid out again.
+          const at4 = at * 4
+          sparkSeed.setXYZW(
+            at,
+            sparkRandom[at4] ?? 0,
+            sparkRandom[at4 + 1] ?? 0,
+            sparkRandom[at4 + 2] ?? 0,
+            place.height * (0.5 + (sparkRandom[at4 + 3] ?? 0) * 0.45),
+          )
           sparkIndex.setX(at, i)
         }
       }
@@ -625,12 +651,13 @@ export default function HeroScene({
       tokenGeometry.instanceCount = count
       sparkGeometry.setDrawRange(0, count * SPARKS_PER_BEAM)
       groundUniforms.uCount.value = count
+      groundUniforms.uLead.value = current.slice(0, count).findIndex((beacon) => beacon.lead)
 
       // Labels that would land on top of a sooner launch's label stay hidden.
       const taken: { left: number; right: number; top: number; bottom: number }[] = []
       labelShown = placements.map((place, i) => {
-        const tag = current[i]?.tag ?? ""
-        const half = (30 + tag.length * 7.6) / 2 + 3
+        const words = `${current[i]?.tag ?? ""}${current[i]?.note ? `  ${current[i]?.note}` : ""}`
+        const half = (30 + words.length * 7.6) / 2 + 3
         const y = vanishY - ((place.height + 0.35 - CAMERA_HEIGHT) / place.distance) * focal
         const rect = { left: place.screenX - half, right: place.screenX + half, top: y - 30, bottom: y + 3 }
         const clash = taken.some(
@@ -651,15 +678,17 @@ export default function HeroScene({
       groundUniforms.uLineAlpha.value = palette.lineAlpha
       groundUniforms.uGlow.value = palette.glow
       skyUniforms.uSun.value.set(palette.sun)
-      skyUniforms.uVeilA.value.set(palette.veilA)
-      skyUniforms.uVeilB.value.set(palette.veilB)
-      skyUniforms.uAurora.value = palette.aurora
+      skyUniforms.uVeil.value.set(palette.veil)
+      skyUniforms.uHaze.value = palette.haze
+      tokenUniforms.uEnvSky.value.set(palette.env.sky)
+      tokenUniforms.uEnvHorizon.value.set(palette.env.horizon)
+      tokenUniforms.uEnvGround.value.set(palette.env.ground)
+      tokenUniforms.uEnvGlow.value.set(palette.env.glow)
       dustUniforms.uTint.value.set(palette.dust)
       beamUniforms.uWhite.value = palette.additive ? 1 : 0
       beamUniforms.uOpacity.value = palette.beam
       beamUniforms.uHalo.value = palette.halo
       skyUniforms.uOpacity.value = palette.sky
-      tokenUniforms.uShade.value = palette.shade
       stars.visible = palette.stars
       for (const material of [skyMaterial, beamMaterial, sparkMaterial, dustMaterial]) {
         material.blending = palette.additive ? AdditiveBlending : NormalBlending
@@ -1020,6 +1049,7 @@ export default function HeroScene({
               className={cn("size-1.5 shrink-0 rounded-full bg-[var(--sat)]", beacon.lead && "animate-pulse-dot")}
             />
             {beacon.tag}
+            {beacon.note && <span className="font-medium text-ink-faint">{beacon.note}</span>}
             {/* The whole beam is part of the button, not just the pill on top of it. */}
             <span aria-hidden className="absolute top-full left-1/2 h-[var(--beam-h,0px)] w-9 -translate-x-1/2" />
             <span
