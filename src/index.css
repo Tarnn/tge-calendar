@@ -241,15 +241,14 @@
   .hero-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "eyebrow" "title" "scene" "sub" "cta" "stats";
+    grid-template-areas: "title" "scene" "sub" "cta" "stats";
   }
   @media (min-width: 64rem) {
     .hero-grid {
       grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
-      grid-template-rows: auto auto auto auto 1fr;
+      grid-template-rows: auto auto auto 1fr;
       column-gap: 2.5rem;
       grid-template-areas:
-        "eyebrow scene"
         "title scene"
         "sub scene"
         "cta scene"
