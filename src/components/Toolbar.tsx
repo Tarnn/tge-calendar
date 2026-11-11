@@ -109,7 +109,11 @@ export function Toolbar({
         </span>
 
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger className="flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink">
+          {/* On a phone only the icon shows, so the name has to be given explicitly. */}
+          <DropdownMenu.Trigger
+            aria-label={t("export.label")}
+            className="flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
+          >
             <Download aria-hidden className="size-4" />
             <span className="hidden sm:inline">{t("export.label")}</span>
           </DropdownMenu.Trigger>

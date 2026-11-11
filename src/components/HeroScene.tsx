@@ -91,6 +91,21 @@ const CAMERA_HEIGHT = 3
 /** How far behind the "now" line the camera stands. */
 const CAMERA_BACK = 11
 const INTRO_SECONDS = 2.8
+/** Frames slower than this on average (about 24 a second) mean the device is struggling. */
+const SLOW_FRAME_MS = 42
+/** Slower than this and lowering the quality will not save it. */
+const HOPELESS_FRAME_MS = 110
+const LOWEST_QUALITY = 0.5
+/** Remembered for the visit, so a struggling device is not asked to try again on every page load. */
+const STILL_KEY = "tge:scene:still"
+
+function storedStill(): boolean {
+  try {
+    return window.sessionStorage.getItem(STILL_KEY) === "1"
+  } catch {
+    return false
+  }
+}
 const SPARKS_PER_BEAM = 16
 
 interface Palette {
@@ -559,11 +574,16 @@ export default function HeroScene({
     let vanishY = 0
     let hovered = -1
     let elapsed = 0
-    let introTime = reducedMotion ? INTRO_SECONDS : 0
+    let introTime = reducedMotion || storedStill() ? INTRO_SECONDS : 0
     let last = performance.now()
     let frame = 0
     let visible = true
     let announced = false
+    /** Share of the usual pixel density being drawn; lowered when frames run slow. */
+    let quality = 1
+    /** True when the scene is a still picture: by preference, or because the device cannot animate it. */
+    let still = reducedMotion || storedStill()
+    const governor = { settleUntil: 0, total: 0, frames: 0 }
     const pointer = { x: 0, y: 0, inside: false }
     const drift = { x: 0, y: 0 }
     const gains = new Float32Array(MAX_BEACONS)
@@ -782,11 +802,13 @@ export default function HeroScene({
       // The camera drops in from above, then idles; the pointer nudges it and
       // scrolling lifts it up and over the runway.
       const arrive = 1 - easeOutExpo(clamp01(introTime / 2.3))
-      const scroll = clamp01(window.scrollY / Math.max(1, height * 0.85))
+      const scroll = still ? 0 : clamp01(window.scrollY / Math.max(1, height * 0.85))
       const lift = scroll * scroll * (3 - 2 * scroll)
-      drift.x += (pointer.x - drift.x) * 0.045
-      drift.y += (pointer.y - drift.y) * 0.045
-      const sway = reducedMotion ? 0 : 1
+      if (!still) {
+        drift.x += (pointer.x - drift.x) * 0.045
+        drift.y += (pointer.y - drift.y) * 0.045
+      }
+      const sway = still ? 0 : 1
       camera.position.set(
         drift.x * 1.5 + Math.sin(elapsed * 0.27) * 0.16 * sway,
         // Whatever the inputs do, the camera stays above the ground.
@@ -808,7 +830,7 @@ export default function HeroScene({
       // Where the pointer's line of sight meets the ground.
       const mouse = groundUniforms.uMouse.value
       let lit = 0
-      if (pointer.inside && !reducedMotion) {
+      if (pointer.inside && !still) {
         ray.set(pointer.x, -pointer.y, 0.5).unproject(camera).sub(camera.position)
         if (ray.y < -0.0001) {
           const reach = -camera.position.y / ray.y
@@ -819,14 +841,14 @@ export default function HeroScene({
           }
         }
       }
-      mouse.z += (lit - mouse.z) * 0.08
+      mouse.z = still ? 0 : mouse.z + (lit - mouse.z) * 0.08
 
       // The hovered beam flares; the others step back.
       for (let i = 0; i < MAX_BEACONS; i += 1) {
         const base = current[i]?.lead ? 1.3 : 1
         const target = i >= placements.length ? 0 : hovered < 0 ? base : i === hovered ? 1.9 : 0.4
         const value = gains[i] ?? 0
-        gains[i] = reducedMotion ? target : value + (target - value) * 0.14
+        gains[i] = still ? target : value + (target - value) * 0.14
         const light = groundUniforms.uBeacon.value[i]
         if (light) light.z = gains[i] ?? 0
       }
@@ -840,18 +862,69 @@ export default function HeroScene({
       }
     }
 
+    /**
+     * Watch how long frames really take. A device that cannot keep up first
+     * gets fewer pixels to fill; one that still cannot is given a single
+     * still frame, the same picture a visitor who prefers reduced motion
+     * sees. The page must never be slow for the sake of its decoration.
+     */
+    function govern(now: number, frameMs: number): void {
+      // Shader compilation makes the first frames slow on any device, and a
+      // long gap means the tab was in the background, not that drawing is slow.
+      if (now < governor.settleUntil || frameMs > 1500) return
+      governor.total += frameMs
+      governor.frames += 1
+      if (governor.frames < 20 && governor.total < 1200) return
+      const average = governor.total / governor.frames
+      governor.total = 0
+      governor.frames = 0
+      if (average <= SLOW_FRAME_MS) return
+      if (average > HOPELESS_FRAME_MS || quality <= LOWEST_QUALITY) {
+        freeze()
+        return
+      }
+      quality = Math.max(LOWEST_QUALITY, quality * 0.66)
+      governor.settleUntil = now + 400
+      resize()
+    }
+
+    /** Stop animating and leave the settled picture on screen. */
+    function freeze(): void {
+      still = true
+      stop()
+      introTime = INTRO_SECONDS
+      // The still picture is taken from the resting camera, not from wherever it was heading.
+      releasePointer()
+      drift.x = 0
+      drift.y = 0
+      groundUniforms.uMouse.value.z = 0
+      try {
+        window.sessionStorage.setItem(STILL_KEY, "1")
+      } catch {
+        // Storage can be unavailable (private mode); the scene is still frozen for this visit.
+      }
+      // The page drops its own decorative animations too (see index.css).
+      document.documentElement.dataset.lite = ""
+      renderFrame()
+    }
+
     function loop(now: number): void {
-      const delta = Math.min(0.05, (now - last) / 1000)
+      const frameMs = now - last
+      const delta = Math.min(0.05, frameMs / 1000)
       last = now
       elapsed += delta
       introTime += delta
       renderFrame()
       frame = requestAnimationFrame(loop)
+      govern(now, frameMs)
     }
 
     function start(): void {
-      if (frame || reducedMotion || !visible || document.hidden) return
+      if (frame || still || !visible || document.hidden) return
       last = performance.now()
+      governor.settleUntil = last + 700
+      governor.total = 0
+      governor.frames = 0
       frame = requestAnimationFrame(loop)
     }
 
@@ -866,7 +939,7 @@ export default function HeroScene({
       if (width === 0 || height === 0) return
       // Keep the pixel count in check on very large or very dense screens.
       const budget = Math.sqrt(4_600_000 / (width * height))
-      const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, budget))
+      const ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, budget)) * quality
       renderer.setPixelRatio(ratio)
       renderer.setSize(width, height, false)
       canvas.style.width = `${width}px`
@@ -896,7 +969,7 @@ export default function HeroScene({
       },
       setHover(index) {
         hovered = index
-        if (reducedMotion) renderFrame()
+        if (still) renderFrame()
       },
     }
 
@@ -941,6 +1014,7 @@ export default function HeroScene({
       }
     })
 
+    if (storedStill()) document.documentElement.dataset.lite = ""
     applyTheme((document.documentElement.dataset.theme as ResolvedTheme | undefined) ?? "dark")
     resize()
     resizeObserver.observe(host)
@@ -1037,9 +1111,8 @@ export default function HeroScene({
             onPointerLeave={hover(-1)}
             onFocus={hover(index)}
             onBlur={hover(-1)}
-            aria-label={`${beacon.title} — ${beacon.detail}`}
             className={cn(
-              "group absolute top-0 left-0 flex origin-bottom items-center gap-1.5 rounded-full border border-line-strong bg-surface/80 py-1 pr-2.5 pl-2 font-mono text-[11px] font-semibold text-ink opacity-0 shadow-card backdrop-blur-md transition-[border-color,background-color,box-shadow] duration-200 will-change-transform hover:z-10 hover:border-[var(--sat)] hover:bg-surface hover:shadow-[0_0_24px_-4px_var(--sat)] focus-visible:z-10 focus-visible:border-[var(--sat)] focus-visible:opacity-100!",
+              "group absolute top-0 left-0 flex origin-bottom items-center gap-1.5 rounded-full border border-line-strong bg-surface/90 py-1 pr-2.5 pl-2 font-mono text-[11px] font-semibold text-ink opacity-0 shadow-card transition-[border-color,background-color,box-shadow] duration-200 will-change-transform hover:z-10 hover:border-[var(--sat)] hover:bg-surface hover:shadow-[0_0_24px_-4px_var(--sat)] focus-visible:z-10 focus-visible:border-[var(--sat)] focus-visible:opacity-100!",
               beacon.lead && "border-[var(--sat)]/60",
             )}
             style={{ "--sat": TYPE_COLOR[beacon.type][theme] } as CSSProperties}
@@ -1050,6 +1123,10 @@ export default function HeroScene({
             />
             {beacon.tag}
             {beacon.note && <span className="font-medium text-ink-faint">{beacon.note}</span>}
+            {/* The name a screen reader hears starts with what is on the label, then says what it is. */}
+            <span className="sr-only">
+              {beacon.title} — {beacon.detail}
+            </span>
             {/* The whole beam is part of the button, not just the pill on top of it. */}
             <span aria-hidden className="absolute top-full left-1/2 h-[var(--beam-h,0px)] w-9 -translate-x-1/2" />
             <span

@@ -113,11 +113,13 @@ function NextUp({
   const when = headline ? eventWhenLong(i18n, headline) : null
 
   return (
+    // Opaque rather than frosted: a blurred backdrop over a canvas that changes
+    // every frame has to be blurred again every frame.
     <motion.aside
       initial={{ opacity: 0, y: 32, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.8, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
-      className="beam-border grid gap-5 rounded-3xl border border-line bg-surface/70 p-5 shadow-card backdrop-blur-xl lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-8 lg:p-6"
+      className="beam-border grid gap-5 rounded-3xl border border-line bg-surface/92 p-5 shadow-card lg:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-8 lg:p-6"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-ink-faint uppercase">
@@ -209,18 +211,28 @@ function sceneAllowed(): boolean {
   return connection?.saveData !== true
 }
 
-/** three.js is ~135 kB gzipped: it is fetched once the browser has nothing better to do. */
+/**
+ * three.js is ~140 kB gzipped and compiling its shaders keeps the main thread
+ * busy. The copy comes first: the scene is fetched only after the headline has
+ * had time to land, and then only when the browser has nothing better to do.
+ */
 function useIdle(enabled: boolean): boolean {
   const [idle, setIdle] = useState(false)
 
   useEffect(() => {
     if (!enabled) return
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(() => setIdle(true), { timeout: 1200 })
-      return () => window.cancelIdleCallback(id)
+    let idleId = 0
+    const timer = globalThis.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(() => setIdle(true), { timeout: 1500 })
+      } else {
+        setIdle(true)
+      }
+    }, 900)
+    return () => {
+      globalThis.clearTimeout(timer)
+      if (idleId) window.cancelIdleCallback(idleId)
     }
-    const id = globalThis.setTimeout(() => setIdle(true), 250)
-    return () => globalThis.clearTimeout(id)
   }, [enabled])
 
   return enabled && idle
@@ -275,6 +287,15 @@ const WORD = {
 const RISE = {
   hidden: { opacity: 0, y: 18, filter: "blur(6px)" },
   shown: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: EASE } },
+}
+/**
+ * For the paragraph that is the largest text on the page: it slides into place
+ * but is never invisible, so the browser can paint it (and count it as the
+ * page's main content) on the very first frame.
+ */
+const SETTLE = {
+  hidden: { y: 14 },
+  shown: { y: 0, transition: { duration: 0.7, ease: EASE } },
 }
 
 function Word({ children, className }: { children: ReactNode; className?: string }) {
@@ -468,7 +489,7 @@ export function Hero({
           )}
 
           <motion.p
-            variants={RISE}
+            variants={SETTLE}
             className="pointer-events-auto mt-5 max-w-xl text-base leading-relaxed text-pretty text-ink-soft [grid-area:sub] sm:text-lg"
           >
             {t("hero.subtitle")}
@@ -494,7 +515,7 @@ export function Hero({
               <button
                 type="button"
                 onClick={onOpenRadar}
-                className="group inline-flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-surface/70 px-3.5 text-sm sm:px-6 font-semibold text-ink backdrop-blur transition-colors hover:border-market/50 hover:bg-raised"
+                className="group inline-flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-surface/90 px-3.5 text-sm sm:px-6 font-semibold text-ink transition-colors hover:border-market/50 hover:bg-raised"
               >
                 <Radar aria-hidden className="size-4 text-market transition-transform duration-500 group-hover:rotate-90" />
                 {t("hero.ctaRadar")}

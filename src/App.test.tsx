@@ -320,9 +320,9 @@ describe("App", () => {
     renderApp()
 
     await user.click(screen.getByRole("tab", { name: "Agenda" }))
-    const row = (await screen.findByText("LayerZero", undefined, LAZY)).closest("li") as HTMLElement
+    const row = (await screen.findByText("Monad", undefined, LAZY)).closest("li") as HTMLElement
     await user.click(within(row).getByRole("button", { name: "Watch" }))
-    expect(JSON.parse(window.localStorage.getItem("tge:watchlist") ?? "[]")).toEqual(["layerzero-unlock-nov"])
+    expect(JSON.parse(window.localStorage.getItem("tge:watchlist") ?? "[]")).toEqual(["monad-unlock-nov"])
 
     await user.click(screen.getByRole("button", { name: "Watchlist" }))
     expect(screen.getByText("1 events")).toBeInTheDocument()

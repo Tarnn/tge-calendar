@@ -338,6 +338,13 @@
       animation: none;
     }
   }
+  /* Set by the hero scene when the device cannot animate it smoothly: the
+     page then gives up its other continuous, repaint-heavy flourishes as well. */
+  [data-lite] .hero-shine,
+  [data-lite] .beam-border::after,
+  [data-lite] .animate-pulse-dot {
+    animation: none;
+  }
 
   /* Page backdrop: faint grid that fades out, with a warm glow behind the hero. */
   .backdrop {
