@@ -760,7 +760,8 @@ export default function HeroScene({
       const sway = reducedMotion ? 0 : 1
       camera.position.set(
         drift.x * 1.5 + Math.sin(elapsed * 0.27) * 0.16 * sway,
-        CAMERA_HEIGHT + arrive * 10 + lift * 9 - drift.y * 0.45 + Math.sin(elapsed * 0.43) * 0.07 * sway,
+        // Whatever the inputs do, the camera stays above the ground.
+        Math.max(1.6, CAMERA_HEIGHT + arrive * 10 + lift * 9 - drift.y * 0.45 + Math.sin(elapsed * 0.43) * 0.07 * sway),
         CAMERA_BACK + arrive * 20 - lift * 20,
       )
       camera.rotation.set(-arrive * 0.36 - lift * 0.24, -drift.x * 0.02, 0)
@@ -870,20 +871,45 @@ export default function HeroScene({
       },
     }
 
+    /** Let the camera settle back to its resting place. */
+    function releasePointer(): void {
+      pointer.x = 0
+      pointer.y = 0
+      pointer.inside = false
+    }
+
     function onPointerMove(event: PointerEvent): void {
+      // Only a mouse steers the camera. A finger scrolling the page is not
+      // pointing at anything, and its coordinates are measured against a hero
+      // that may be thousands of pixels off screen.
+      if (event.pointerType !== "mouse") return
       const box = host?.getBoundingClientRect()
-      if (!box || box.width === 0) return
-      pointer.x = ((event.clientX - box.left) / box.width) * 2 - 1
-      pointer.y = ((event.clientY - box.top) / box.height) * 2 - 1
-      pointer.inside = Math.abs(pointer.x) <= 1 && Math.abs(pointer.y) <= 1
+      if (!box || box.width === 0 || box.height === 0) return
+      const x = ((event.clientX - box.left) / box.width) * 2 - 1
+      const y = ((event.clientY - box.top) / box.height) * 2 - 1
+      // Outside the hero the pointer has no say: without this, moving the
+      // mouse far down the page would drag the camera through the ground.
+      if (Math.abs(x) > 1 || Math.abs(y) > 1) {
+        releasePointer()
+        return
+      }
+      pointer.x = x
+      pointer.y = y
+      pointer.inside = true
     }
 
     const onVisibility = (): void => (document.hidden ? stop() : start())
     const resizeObserver = new ResizeObserver(resize)
     const intersectionObserver = new IntersectionObserver(([entry]) => {
       visible = entry?.isIntersecting ?? true
-      if (visible) start()
-      else stop()
+      if (visible) {
+        start()
+      } else {
+        // Coming back into view, the scene starts from rest rather than from
+        // wherever the pointer last was.
+        releasePointer()
+        stop()
+      }
     })
 
     applyTheme((document.documentElement.dataset.theme as ResolvedTheme | undefined) ?? "dark")
