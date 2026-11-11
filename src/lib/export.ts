@@ -1,5 +1,5 @@
-import type { TgeEvent } from "@/types"
-import { addDays, eventInstant } from "@/lib/dates"
+import type { TgeEvent } from "../types.js"
+import { addDays, eventInstant } from "./dates.js"
 
 const SITE_URL = "https://github.com/Tarnn/tge-calendar"
 
@@ -86,6 +86,9 @@ export function buildIcs(events: TgeEvent[], now: Date = new Date()): string {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "X-WR-CALNAME:TGE Calendar",
+    // Honoured by clients that subscribe to the feed rather than import it once.
+    "REFRESH-INTERVAL;VALUE=DURATION:PT12H",
+    "X-PUBLISHED-TTL:PT12H",
   ]
   for (const event of events) {
     const span = calendarSpan(event)

@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { motion } from "framer-motion"
-import { CalendarDays, Check, Download, List, Radar, SlidersHorizontal, Star, X } from "lucide-react"
+import { CalendarDays, Check, Download, List, Radar, Rss, Search, SlidersHorizontal, Star, X } from "lucide-react"
 import type { EventFilters, EventStatus, EventType, ViewMode } from "@/types"
 import { useI18n } from "@/i18n/context"
 import { cn } from "@/lib/cn"
@@ -28,9 +28,20 @@ export interface ToolbarProps {
   chains: string[]
   resultCount: number
   onExport: (format: "ics" | "csv") => void
+  /** webcal:// address of the live calendar feed, when the host serves one. */
+  subscribeUrl?: string
 }
 
-export function Toolbar({ view, onViewChange, filters, onFiltersChange, chains, resultCount, onExport }: ToolbarProps) {
+export function Toolbar({
+  view,
+  onViewChange,
+  filters,
+  onFiltersChange,
+  chains,
+  resultCount,
+  onExport,
+  subscribeUrl,
+}: ToolbarProps) {
   const { t } = useI18n()
   const activeCount = activeFilterCount(filters)
   const menuCount = filters.statuses.length + filters.chains.length
@@ -79,6 +90,18 @@ export function Toolbar({ view, onViewChange, filters, onFiltersChange, chains, 
           })}
         </div>
 
+        <label className="relative order-last w-full sm:order-none sm:w-64">
+          <span className="sr-only">{t("filter.search")}</span>
+          <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" />
+          <input
+            type="search"
+            value={filters.query}
+            onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })}
+            placeholder={t("filter.search")}
+            className="h-9 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-sm text-ink outline-none transition-colors placeholder:text-ink-faint hover:border-line-strong focus:border-brand [&::-webkit-search-cancel-button]:appearance-none"
+          />
+        </label>
+
         <div className="flex-1" />
 
         <span className="tabular text-sm text-ink-faint" aria-live="polite">
@@ -99,6 +122,20 @@ export function Toolbar({ view, onViewChange, filters, onFiltersChange, chains, 
                 {t("export.csv")}
               </DropdownMenu.Item>
               <p className="px-2.5 pt-1 pb-2 text-xs text-ink-faint">{t("export.hint")}</p>
+              {subscribeUrl && (
+                <>
+                  <DropdownMenu.Separator className="my-1 h-px bg-line" />
+                  <DropdownMenu.Item asChild className={menuItem}>
+                    <a href={subscribeUrl}>
+                      <Rss aria-hidden className="size-4" />
+                      <span>
+                        {t("export.subscribe")}
+                        <span className="block text-xs text-ink-faint">{t("export.subscribeHint")}</span>
+                      </span>
+                    </a>
+                  </DropdownMenu.Item>
+                </>
+              )}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>

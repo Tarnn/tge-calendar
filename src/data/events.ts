@@ -1,4 +1,4 @@
-import type { TgeEvent } from "@/types"
+import type { TgeEvent } from "../types.js"
 
 /**
  * Curated calendar. Every row is taken from a public tracker or the project's

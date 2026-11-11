@@ -1,3 +1,4 @@
+import logoUrl from "@/assets/logo.png"
 import { toast } from "sonner"
 import { useI18n } from "@/i18n/context"
 import { DATASET_VERIFIED_ON } from "@/data/events"
@@ -37,7 +38,7 @@ export function Footer({ onReport }: { onReport: () => void }) {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <img src="/crypto-calendar.png" alt="" width={28} height={28} className="size-7 rounded-lg" />
+            <img src={logoUrl} alt="" width={28} height={28} className="size-7 rounded-lg" />
             <span className="font-display text-[17px] font-semibold tracking-tight">
               <span className="text-brand-ink">TGE</span> Calendar
             </span>

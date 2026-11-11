@@ -1,7 +1,7 @@
 // zod/mini: same validation, a fraction of the bundle.
 import * as z from "zod/mini"
-import type { FdvPoint, ListingPoint, MarketSignal, OddsPoint } from "@/types"
-import { utcDayKey } from "@/lib/dates"
+import type { FdvPoint, ListingPoint, MarketSignal, OddsPoint } from "../types.js"
+import { utcDayKey } from "./dates.js"
 
 /**
  * Polymarket's public Gamma API. No key, CORS-enabled, cached ~5 min upstream.

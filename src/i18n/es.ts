@@ -116,6 +116,15 @@ export const es: Messages = {
   "radar.updated": "Actualizado a las {time}",
   "radar.cached": "Mostrando cuotas guardadas de las {time}",
 
+  "radar.sortMovers": "Mayores movimientos",
+  "radar.move": "{points} pts en 24 h",
+  "filter.search": "Filtra por nombre, ticker, red…",
+  "export.subscribe": "Suscribirse desde una app de calendario",
+  "export.subscribeHint": "Se actualiza solo",
+  "error.title": "Algo ha fallado aquí",
+  "error.body": "Esta parte de la página ha tenido un error inesperado. El resto sigue funcionando.",
+  "error.retry": "Reintentar",
+
   "date.by": "antes del {date}",
   "date.passed": "Fecha pasada",
   "date.localTime": "{time} en tu hora",

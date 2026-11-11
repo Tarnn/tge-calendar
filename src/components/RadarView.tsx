@@ -6,14 +6,23 @@ import type { LiveState } from "@/hooks/useEvents"
 import { useI18n } from "@/i18n/context"
 import { cn } from "@/lib/cn"
 import { formatUsdCompact } from "@/lib/format"
-import { eventWhenShort, formatDay, formatDeadline } from "@/lib/eventText"
+import { eventWhenShort, formatDeadline } from "@/lib/eventText"
 import type { DayKey } from "@/lib/dates"
 import { Avatar, StatusBadge, WatchButton } from "@/components/EventBits"
 import { OddsBars } from "@/components/OddsBars"
+import { biggestMove } from "@/lib/signals"
 
-type SortMode = "likely" | "volume" | "fdv"
-const SORTS: readonly SortMode[] = ["likely", "volume", "fdv"]
-const SORT_LABEL = { likely: "radar.sortLikely", volume: "radar.sortVolume", fdv: "radar.sortFdv" } as const
+type SortMode = "likely" | "movers" | "volume" | "fdv"
+const SORTS: readonly SortMode[] = ["likely", "movers", "volume", "fdv"]
+const SORT_LABEL = {
+  likely: "radar.sortLikely",
+  movers: "radar.sortMovers",
+  volume: "radar.sortVolume",
+  fdv: "radar.sortFdv",
+} as const
+
+/** Moves smaller than this are noise and are not called out on a card. */
+const NOTABLE_MOVE = 0.02
 
 function compare(mode: SortMode): (a: TgeEvent, b: TgeEvent) => number {
   return (a, b) => {
@@ -21,6 +30,9 @@ function compare(mode: SortMode): (a: TgeEvent, b: TgeEvent) => number {
     const sb = b.signal
     if (!sa || !sb) return 0
     if (mode === "volume") return sb.volumeUsd - sa.volumeUsd
+    if (mode === "movers") {
+      return Math.abs(biggestMove(sb)) - Math.abs(biggestMove(sa)) || sb.volumeUsd - sa.volumeUsd
+    }
     if (mode === "fdv") return (sb.impliedFdvUsd ?? 0) - (sa.impliedFdvUsd ?? 0) || sb.volumeUsd - sa.volumeUsd
     // "Soonest likely": projects the market expects by a date first (earliest date first),
     // then everything else by how close the nearest deadline is to a coin flip.
@@ -50,9 +62,15 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
 
   const cards = useMemo(() => events.filter((event) => event.signal).sort(compare(sort)), [events, sort])
 
+  // Fresh odds show a clock time; a snapshot or failed refresh shows the full date too.
   const time =
     live.updatedAt > 0
-      ? new Intl.DateTimeFormat(intl, { hour: "numeric", minute: "2-digit" }).format(new Date(live.updatedAt))
+      ? new Intl.DateTimeFormat(
+          intl,
+          live.isStale
+            ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }
+            : { hour: "numeric", minute: "2-digit" },
+        ).format(new Date(live.updatedAt))
       : null
 
   return (
@@ -68,9 +86,9 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
             <span className="tabular flex items-center gap-1.5 text-xs text-ink-faint">
               <span
                 aria-hidden
-                className={cn("size-1.5 rounded-full", live.isError ? "bg-warn" : "animate-pulse-dot bg-ok")}
+                className={cn("size-1.5 rounded-full", live.isStale ? "bg-warn" : "animate-pulse-dot bg-ok")}
               />
-              {t(live.isError ? "radar.cached" : "radar.updated", { time })}
+              {t(live.isStale ? "radar.cached" : "radar.updated", { time })}
             </span>
           )}
           <div role="group" aria-label={t("view.label")} className="flex rounded-xl border border-line bg-surface p-1">
@@ -127,6 +145,8 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
             if (!signal) return null
             const scheduled = event.status !== "market"
             const watched = isWatched(event.id)
+            const move = biggestMove(signal)
+            const movePoints = Math.round(move * 100)
             return (
               <motion.li
                 key={event.id}
@@ -153,10 +173,15 @@ export function RadarView({ events, live, today, onOpenEvent, isWatched, onToggl
                     <p className="mt-1 text-sm">
                       {signal.likelyBy ? (
                         <span className="font-medium text-market">
-                          {t("radar.likelyBy", { date: formatDay(i18n, signal.likelyBy.date) })}
+                          {t("radar.likelyBy", { date: formatDeadline(i18n, signal.likelyBy.date, today) })}
                         </span>
                       ) : (
                         <span className="text-ink-faint">{t("radar.noDate")}</span>
+                      )}
+                      {Math.abs(move) >= NOTABLE_MOVE && (
+                        <span className={cn("tabular ml-2 font-mono text-xs", move > 0 ? "text-ok" : "text-bad")}>
+                          {t("radar.move", { points: movePoints > 0 ? `+${movePoints}` : `−${Math.abs(movePoints)}` })}
+                        </span>
                       )}
                     </p>
                   </div>

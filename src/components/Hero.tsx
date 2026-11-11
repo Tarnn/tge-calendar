@@ -3,6 +3,7 @@ import { animate, motion, useInView, useReducedMotion } from "framer-motion"
 import { ArrowRight, Radar } from "lucide-react"
 import type { TgeEvent } from "@/types"
 import type { ResolvedTheme } from "@/hooks/useTheme"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useNow } from "@/hooks/useNow"
 import { useI18n } from "@/i18n/context"
 import { countdownParts, countdownTarget, eventDaySpan } from "@/lib/dates"
@@ -156,8 +157,33 @@ export interface HeroProps {
   onOpenRadar: () => void
 }
 
+/**
+ * three.js is ~130 kB gzipped. It is fetched only on screens wide enough to
+ * show the scene properly, only once the browser is idle, and never when the
+ * visitor has asked their browser to save data.
+ */
+function useSceneEnabled(): boolean {
+  const wide = useMediaQuery("(min-width: 1024px)")
+  const [idle, setIdle] = useState(false)
+
+  useEffect(() => {
+    if (!wide) return
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    if (connection?.saveData) return
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(() => setIdle(true), { timeout: 1500 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const id = globalThis.setTimeout(() => setIdle(true), 300)
+    return () => globalThis.clearTimeout(id)
+  }, [wide])
+
+  return wide && idle
+}
+
 export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCalendar, onOpenRadar }: HeroProps) {
   const { t } = useI18n()
+  const sceneEnabled = useSceneEnabled()
   const integer = (n: number): string => String(Math.round(n))
 
   const statItems = [
@@ -169,18 +195,20 @@ export function Hero({ theme, stats, headline, following, onOpenEvent, onOpenCal
 
   return (
     <section id="top" className="relative overflow-hidden">
-      {/* 3D backdrop: the right-hand side on desktop, a faint wash behind the copy on phones. */}
+      {/* 3D backdrop on the right-hand side; smaller screens keep the lighter CSS glow. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-0 right-0 h-[28rem] w-full opacity-30 sm:h-[32rem] lg:w-[54%] lg:opacity-100"
+        className="pointer-events-none absolute top-0 right-0 hidden h-[32rem] w-[54%] lg:block"
         style={{
           maskImage: "radial-gradient(ellipse 62% 62% at 50% 46%, black 45%, transparent 100%)",
           WebkitMaskImage: "radial-gradient(ellipse 62% 62% at 50% 46%, black 45%, transparent 100%)",
         }}
       >
-        <Suspense fallback={null}>
-          <HeroScene theme={theme} />
-        </Suspense>
+        {sceneEnabled && (
+          <Suspense fallback={null}>
+            <HeroScene theme={theme} />
+          </Suspense>
+        )}
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 pt-10 pb-12 sm:px-6 sm:pt-14 lg:pt-16 lg:pb-14">
