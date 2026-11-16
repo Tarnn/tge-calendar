@@ -146,8 +146,8 @@ describe("App", () => {
     stubFetch()
     renderApp()
     const rail = screen.getByRole("heading", { name: /date to be announced/i }).closest("section") as HTMLElement
-    expect(within(rail).getByText("Wire Network")).toBeInTheDocument()
-    expect(within(rail).getByText("Second half of November")).toBeInTheDocument()
+    expect(within(rail).getByText("Xsolla ZK")).toBeInTheDocument()
+    expect(within(rail).getByText("Coming soon on Kraken — date TBA")).toBeInTheDocument()
     expect(within(rail).getByText("Variational")).toBeInTheDocument()
   })
 
@@ -161,7 +161,7 @@ describe("App", () => {
     expect(within(predict).getByText("Likely by Nov 30")).toBeInTheDocument()
     expect(within(predict).getByText("69%")).toBeInTheDocument()
     // Curated status rides along with the market signal.
-    expect(within(predict).getByText("Expected")).toBeInTheDocument()
+    expect(within(predict).getByText("Confirmed")).toBeInTheDocument()
 
     const metamask = screen.getByRole("button", { name: "MetaMask" }).closest("li") as HTMLElement
     expect(within(metamask).getByText("No date above 50%")).toBeInTheDocument()
@@ -187,7 +187,7 @@ describe("App", () => {
     const grid = screen.getByRole("grid")
     expect(within(grid).getByRole("button", { name: "MON" })).toBeInTheDocument()
     expect(within(grid).queryByRole("button", { name: "KDX" })).not.toBeInTheDocument()
-    expect(screen.getByText("5 events")).toBeInTheDocument()
+    expect(screen.getByText("8 events")).toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Clear all" }))
     expect(within(grid).getByRole("button", { name: "KDX" })).toBeInTheDocument()
@@ -297,7 +297,7 @@ describe("App", () => {
     dialog = await screen.findByRole("dialog")
     expect(within(dialog).getByText("Confirmed")).toBeInTheDocument()
     expect(within(dialog).getByText(/14:00 UTC/)).toBeInTheDocument()
-    expect(within(dialog).getByText("KuCoin, Bybit (reported)")).toBeInTheDocument()
+    expect(within(dialog).getByText("KuCoin, Bybit, Kraken, Bitpanda, Gate")).toBeInTheDocument()
     expect(within(dialog).getAllByRole("link", { name: /KuCoin — listing announcement/ })).toHaveLength(1)
     // The saved feed survives a visit where the API is unreachable.
     expect(window.localStorage.getItem("tge:listings:v1")).toContain("kucoin-1")
@@ -311,7 +311,7 @@ describe("App", () => {
 
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"))
     renderApp()
-    expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 65 days ago, on Nov 11, 2026\./)
+    expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 60 days ago, on Nov 16, 2026\./)
   })
 
   it("offers a way back to the top once the page has been scrolled", async () => {

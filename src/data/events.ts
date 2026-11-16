@@ -9,7 +9,7 @@ import type { TgeEvent } from "../types.js"
  * To add or correct an event, edit this file and open a pull request.
  * Day precision needs an exact date; anything vaguer is a `window`.
  */
-export const DATASET_VERIFIED_ON = "2026-11-11"
+export const DATASET_VERIFIED_ON = "2026-11-16"
 
 /** Past this many days without a re-check, the page says so next to the calendar. */
 export const DATASET_STALE_AFTER_DAYS = 21
@@ -48,6 +48,10 @@ const SOUL_DELAY = {
 const MRNASDOG_NOV = {
   label: "MrNasDog — token unlocks, November 2026",
   url: "https://mrnasdog.com/token-unlocks/november-2026",
+}
+const MRNASDOG_DEC = {
+  label: "MrNasDog — token unlocks, December 2026",
+  url: "https://mrnasdog.com/token-unlocks/december-2026",
 }
 
 const Q4_2026 = { date: "2026-10-01", endDate: "2026-12-31" } as const
@@ -123,16 +127,24 @@ const curated: Curated[] = [
     project: "AmericanFortress",
     symbol: "AF",
     type: "tge",
-    status: "expected",
-    precision: "day",
+    status: "tentative",
+    precision: "window",
     date: "2026-11-04",
-    endDate: "2026-11-04",
+    endDate: "2026-12-31",
+    dateLabel: "Missed November 4 — new date TBA",
     categories: ["Privacy"],
     summary: "Privacy-layer project that announced an $8M seed round in May 2026.",
-    note: "Listing venue was still pending acceptance; trackers named OKX Europe, the MiCA whitepaper names Kraken's EU entity.",
+    note: "The project's MiCA white paper set November 4 for the TGE and admission to trading; trackers name OKX Europe as the venue, an earlier report named Kraken's EU entity. The day passed without a launch post or an exchange notice and no new date has been announced. The window shown is only a placeholder that runs to the end of the year.",
     raisedUsd: 8_000_000,
     venues: ["OKX Europe (planned)"],
-    sources: [BITRUE_NOV],
+    sources: [
+      { label: "TGE Index — AmericanFortress, checked November 12", url: "https://tgeindex.com/tge/americanfortress/" },
+      {
+        label: "Cryptolaxy — AF TGE and OKX Europe listing, date TBA",
+        url: "https://cryptolaxy.com/event/americanfortress-af-tge-okx-europe-listing",
+      },
+      BITRUE_NOV,
+    ],
   },
   {
     id: "kor-protocol-tge",
@@ -144,15 +156,18 @@ const curated: Curated[] = [
     date: "2026-11-04",
     endDate: "2026-11-04",
     timeUtc: "14:00",
+    chain: "Base",
     categories: ["AI", "IP"],
     summary: "A creative-asset clearinghouse for the AI economy. 22.87% of supply circulating at TGE.",
-    note: "KuCoin opened trading as a world premiere listing. A Bybit spot listing was reported by trackers but not confirmed by the exchange.",
-    venues: ["KuCoin", "Bybit (reported)"],
+    note: "Launched as scheduled. KuCoin opened KOR/USDT as a world premiere listing, and the project announced trading on Bybit within the same hour. TGE Index, which checks official posts, also records Kraken and Bitpanda on November 4 and Gate from November 5.",
+    venues: ["KuCoin", "Bybit", "Kraken", "Bitpanda", "Gate"],
     sources: [
       {
         label: "KuCoin — listing announcement",
         url: "https://www.kucoin.com/announcement/en-hodler-airdrops-kor-protocol-kor-world-premiere-listing-on-kucoin",
       },
+      { label: "KOR Protocol on X — trading live on Bybit", url: "https://x.com/KorProtocol/status/2117983650109358431" },
+      { label: "TGE Index — KOR Protocol, checked November 7", url: "https://tgeindex.com/tge/kor-protocol/" },
       BITRUE_NOV,
       KUCOIN_NOV,
     ],
@@ -175,14 +190,22 @@ const curated: Curated[] = [
     project: "Slop Cash",
     symbol: "SLOP",
     type: "sale",
-    status: "expected",
+    status: "confirmed",
     precision: "range",
     date: "2026-11-05",
     endDate: "2026-11-10",
+    chain: "Robinhood Chain",
     categories: ["Token sale"],
-    summary: "Token auction hosted on the Umia launch platform.",
-    venues: ["Umia"],
-    sources: [BITRUE_NOV, KUCOIN_NOV],
+    summary:
+      "Token auction hosted on the Umia launch platform. SLOP went live on November 10, after the auction, in a Uniswap v4 SLOP/USDG pool on Robinhood Chain.",
+    note: "The project says that pool is the only official one and has published the contract address. There is no exchange listing.",
+    venues: ["Umia", "Uniswap v4"],
+    sources: [
+      { label: "Slop Cash on X — official contract and pool", url: "https://x.com/SlopCash/status/2120268502670114940" },
+      { label: "TGE Index — Slop Cash, checked November 11", url: "https://tgeindex.com/tge/slop-cash/" },
+      BITRUE_NOV,
+      KUCOIN_NOV,
+    ],
   },
   {
     id: "mori-finance-sale",
@@ -195,9 +218,11 @@ const curated: Curated[] = [
     endDate: "2026-11-13",
     chain: "Solana",
     categories: ["Derivatives", "Options"],
-    summary: "Solana options protocol raising on MetaDAO. The raise opened on November 9 at 19:00 UTC and runs for four days.",
+    summary:
+      "Solana options protocol that raised on MetaDAO from November 9 to 13. The sale closed with $7.7M committed against a $250,000 cap, which set the initial price at $0.025; the token went live the same day.",
     venues: ["MetaDAO"],
     sources: [
+      { label: "MetaDAO on X — Mori Finance ICO closed", url: "https://x.com/MetaDAOProject/status/2121317375991595342" },
       {
         label: "Solana Compass — Mori Finance raise opens on MetaDAO",
         url: "https://solanacompass.com/news/metadaos-1609sat-raise-closes-79x-oversubscribed-with-79m-committed-as-mori-finance-raise-opens",
@@ -211,14 +236,21 @@ const curated: Curated[] = [
     symbol: "FRAC",
     type: "tge",
     status: "tentative",
-    precision: "day",
+    precision: "window",
     date: "2026-11-11",
-    endDate: "2026-11-11",
+    endDate: "2026-12-31",
+    dateLabel: "Missed November 11 — new date TBA",
     chain: "Ethereum",
     categories: ["AI"],
-    summary: "Admission-to-trading date taken from the project's MiCA white paper, which describes FRAC as an ERC-20 on Ethereum.",
-    note: "The team had not confirmed this date on X, and no exchange listing had been announced as of November 11.",
+    summary:
+      "AI-agent platform whose MiCA white paper describes FRAC as an ERC-20 on Ethereum and named November 11 for admission to trading.",
+    note: "November 11 passed without a launch post or an exchange notice, and the team has not announced a new date; trackers note the launch has moved more than once. The window shown is only a placeholder that runs to the end of the year.",
     sources: [
+      { label: "TGE Index — Fraction AI, checked November 12", url: "https://tgeindex.com/tge/fraction-ai/" },
+      {
+        label: "Cryptolaxy — FRAC TGE and admission to trading, date TBA",
+        url: "https://cryptolaxy.com/event/fraction-ai-frac-tge-admission-to-trading",
+      },
       { label: "Fraction AI — MiCA white paper", url: "https://fractionai.xyz/MICAWhitepaper" },
       BITRUE_NOV,
     ],
@@ -244,6 +276,28 @@ const curated: Curated[] = [
         url: "https://www.kucoin.com/announcement/en-world-premiere-matrix-mtx-listed-on-kucoin",
       },
       { label: "Bitget — listing announcement", url: "https://www.bitget.com/en/support/articles/12560603900217" },
+    ],
+  },
+  {
+    id: "xsolla-zk-tge",
+    project: "Xsolla ZK",
+    symbol: "XLA",
+    type: "tge",
+    status: "expected",
+    precision: "window",
+    date: "2026-11-10",
+    endDate: "2026-11-30",
+    dateLabel: "Coming soon on Kraken — date TBA",
+    chain: "Ethereum",
+    categories: ["Gaming", "L2"],
+    summary:
+      "Gas token of Xsolla ZK, a games-focused Ethereum layer 2 on the ZKsync stack from the payments company Xsolla. The MiCA white paper says the whole 1B supply is unlocked from the TGE.",
+    note: "The white paper gives November 10 as the first day of admission to trading and names Kraken and Bitvavo. Kraken posted \"Coming soon\" on November 16 without a date. The end of the window is a tracker's November target, not an announced deadline.",
+    venues: ["Kraken (coming soon)", "Bitvavo (named in the white paper)"],
+    sources: [
+      { label: "Kraken Listings on X — Xsolla ZK coming soon", url: "https://x.com/krakenlistings/status/2122344039634862280" },
+      { label: "Xsolla ZK — MiCA white paper", url: "https://xsolla.org/mica-whitepaper.html" },
+      { label: "TGE Index — Xsolla ZK, checked November 16", url: "https://tgeindex.com/tge/xsolla-zk/" },
     ],
   },
   {
@@ -303,6 +357,7 @@ const curated: Curated[] = [
     raisedUsd: 3_500_000,
     sources: [
       { label: "Bitrue — KieDex (KDX) TGE", url: "https://www.bitrue.com/blog/kiedex-kdx-tge" },
+      { label: "KieDex on X — TGE officially set for November 18", url: "https://x.com/kiedexapp/status/2115830448261828685" },
       ICO_ANALYTICS,
     ],
   },
@@ -391,18 +446,20 @@ const curated: Curated[] = [
     type: "tge",
     status: "confirmed",
     precision: "window",
-    date: "2026-11-16",
-    endDate: "2026-11-30",
-    dateLabel: "Second half of November",
+    date: "2026-12-01",
+    endDate: "2026-12-31",
     categories: ["Interoperability", "AI agents"],
     summary: "Cross-chain transaction layer for humans and AI agents. Pre-tokens convert 1:1 at TGE.",
-    note: "Postponed from October 27. The project itself gave the new window but has not named a day; it says it is finalising listings, and total supply is not published.",
+    note: "Postponed twice: from October 27 to the second half of November, then on November 13 to December. The team says exchange listing schedules slipped after recent security incidents, that TGE and mainnet will still happen on the same day, and that it will name the date once its listing partners confirm. Total supply is not published.",
     sources: [
       {
-        label: "Wire Network on X — TGE moved to the second half of November",
+        label: "Wire Network on X — TGE and mainnet moved to December",
+        url: "https://x.com/WireNetwork/status/2121371031919345880",
+      },
+      {
+        label: "Wire Network on X — earlier move to the second half of November",
         url: "https://x.com/WireNetwork/status/2114839754730803673",
       },
-      BITRUE_NOV,
     ],
   },
   {
@@ -418,10 +475,14 @@ const curated: Curated[] = [
     categories: ["Perp DEX", "DeFi"],
     summary:
       "Perpetual futures exchange (formerly X10). 30% of supply goes to points participants, fully unlocked at TGE. The team says XTEN will be the first third-party token to launch on Arc.",
-    note: "The whitepaper's November 2 date was withdrawn that same day; a new date is to be announced.",
+    note: "The whitepaper's November 2 date was withdrawn that same day. On November 11 the team opened the allocation checker — terms must be accepted by December 31, 23:59 UTC — and said the TGE date will be announced separately, so the launch may fall outside November.",
     raisedUsd: 19_000_000,
     sources: [
       { label: "Extended on X — launch date withdrawn", url: "https://x.com/extendedapp/status/2117309226423108056" },
+      {
+        label: "The Defiant — XTEN checker opens, TGE date still to be announced",
+        url: "https://thedefiant.io/news/tokens/extended-opens-xten-checker-with-dec-31-signing-deadline",
+      },
       BITRUE_NOV,
       ICO_ANALYTICS,
     ],
@@ -431,28 +492,89 @@ const curated: Curated[] = [
     project: "Predict.fun",
     symbol: "PREDICT",
     type: "tge",
-    status: "expected",
-    precision: "window",
-    date: "2026-11-01",
-    endDate: "2026-12-31",
-    dateLabel: "Postponed — new date TBA",
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-18",
+    endDate: "2026-11-18",
+    timeUtc: "09:00",
     chain: "BNB Chain",
     categories: ["Prediction market"],
     summary:
       "Prediction-market platform. 16% of supply unlocks at TGE, with 7% set aside for the Season 1 airdrop.",
-    note: "Binance had announced spot trading for October 30 at 10:00 UTC and postponed it hours before the open, until further notice; the team delayed the TGE and Season 1 airdrop claim with it. Ignore any claim site until the team posts a new time.",
-    venues: ["Binance Wallet (Pre-TGE Prime Sale)", "Binance (spot listing postponed)", "MEXC (postponed)"],
+    note: "Rescheduled: the October 30 launch was called off hours before the open. Binance Wallet says the TGE resumes at 09:00 UTC with trading on Binance Alpha, and Season 1 airdrop claims are reported to open at the same time, with a choice between 35% at once or the full amount in monthly instalments over a year. No new time was found for the Binance spot listing postponed in October, and one weekly round-up notes that Binance's updated airdrop announcement dates its first distribution December 18.",
+    venues: ["Binance Wallet (Pre-TGE Prime Sale)", "Binance Alpha", "Binance (spot listing postponed)", "MEXC (postponed)"],
     sources: [
+      {
+        label: "Binance Wallet on X — PREDICT TGE resumes November 18, 09:00 UTC",
+        url: "https://x.com/BinanceWallet/status/2120781504465014809",
+      },
+      {
+        label: "Binance Square — Predict.fun relaunch and airdrop claim options",
+        url: "https://www.binance.com/en-IN/square/post/388262110092884",
+      },
+      {
+        label: "JrKripto — crypto this week, November 16–22",
+        url: "https://jrkripto.com/en/news/crypto-this-week-48-events-in-focus",
+      },
       { label: "CoinGabbar — Predict.fun TGE delayed", url: "https://www.coingabbar.com/en/predict-fun-tge-delayed" },
       {
         label: "Binance — PREDICT listing announcement (since postponed)",
         url: "https://www.binance.com/en/support/announcement/a259777ee4104befa3daba5c1eadc7b5",
       },
-      KUCOIN_NOV,
     ],
   },
 
   // ── December 2026 and Q4 windows ───────────────────────────────────────
+  {
+    id: "pieverse-unlock-dec",
+    project: "Pieverse",
+    symbol: "PIEVERSE",
+    type: "unlock",
+    status: "expected",
+    precision: "day",
+    date: "2026-12-14",
+    endDate: "2026-12-14",
+    categories: ["Unlock"],
+    summary:
+      "Monthly release. Trackers count it differently: 16.7M PIEVERSE to team and investors, about $34M at mid-November prices, or 33.4M across all recipients, about $56M.",
+    sources: [
+      MRNASDOG_DEC,
+      { label: "Tokenomics.com — Pieverse unlock schedule", url: "https://app.tokenomics.com/tokenomics/pieverse/unlocks" },
+    ],
+  },
+  {
+    id: "layerzero-unlock-dec",
+    project: "LayerZero",
+    symbol: "ZRO",
+    type: "unlock",
+    status: "expected",
+    precision: "day",
+    date: "2026-12-20",
+    endDate: "2026-12-20",
+    categories: ["Interoperability", "Unlock"],
+    summary: "About 23.3M ZRO scheduled to unlock for investors and the team, roughly $33M at mid-November prices.",
+    note: "Monthly release. Trackers differed by a day on November's, the 19th or the 20th, so the same may apply here.",
+    sources: [MRNASDOG_DEC],
+  },
+  {
+    id: "lighter-unlock-dec",
+    project: "Lighter",
+    symbol: "LIT",
+    type: "unlock",
+    status: "expected",
+    precision: "window",
+    date: "2026-12-27",
+    endDate: "2026-12-29",
+    dateLabel: "December 27–29",
+    categories: ["Perp DEX", "Unlock"],
+    summary: "Team and investor LIT starts to unlock after a one-year lock, at about 3.19M LIT a week.",
+    note: "Trackers differ on the first day: MrNasDog gives December 27, DefiLlama December 29. The two allocations are half of total supply, 26% team and 24% investors, and vest over three years.",
+    sources: [
+      MRNASDOG_DEC,
+      { label: "DefiLlama — Lighter (LIT) unlocks", url: "https://defillama.com/unlocks/lighter" },
+      { label: "Lighter on X — team and investor vesting terms", url: "https://x.com/Lighter_xyz/status/2005862687331303804" },
+    ],
+  },
   {
     id: "soul-labs-tge",
     project: "Soul Labs",
@@ -568,7 +690,11 @@ const curated: Curated[] = [
     ...Q4_2026,
     categories: ["DeFi", "RWA", "Stablecoins"],
     summary: "Real-world-asset backed stablecoin protocol.",
-    sources: [ICO_ANALYTICS],
+    note: "A TGE set for October 13 was postponed; the project's docs now say the date is to be determined.",
+    sources: [
+      ICO_ANALYTICS,
+      { label: "TGE Index — Apyx, checked November 11", url: "https://tgeindex.com/tge/apyx/" },
+    ],
   },
   {
     id: "saturn-credit-tge",
@@ -666,18 +792,6 @@ const curated: Curated[] = [
     venues: ["MetaDAO"],
     sources: [ICO_ANALYTICS],
   },
-  {
-    id: "flop-labs-airdrop",
-    project: "Flop Labs",
-    symbol: "FLOP",
-    type: "airdrop",
-    status: "expected",
-    precision: "window",
-    ...Q4_2026,
-    categories: ["AI", "DePIN", "Storage"],
-    summary: "Decentralised storage for AI; airdrop expected this quarter.",
-    sources: [ICO_ANALYTICS],
-  },
 
   // ── 2027 ───────────────────────────────────────────────────────────────
   {
@@ -693,6 +807,24 @@ const curated: Curated[] = [
     summary: "Public mainnet release of the identity-aware lending protocol.",
     note: "Moved from October 19, 2026 for another round of security testing. The team describes January 5 as a target and has promised monthly updates.",
     sources: [SOUL_DELAY, ICO_ANALYTICS],
+  },
+  {
+    id: "flop-labs-airdrop",
+    project: "Flop Labs",
+    symbol: "FLOP",
+    type: "airdrop",
+    status: "tentative",
+    precision: "window",
+    date: "2027-01-01",
+    endDate: "2027-03-31",
+    categories: ["AI", "DePIN"],
+    summary:
+      "Proof-of-work network where AI agents pay miners for inference. The genesis airdrop comes with mainnet and TGE, which the project targets for Q1 2027.",
+    note: "Moved from Q4 2026. The official page says no FLOP token exists yet and targets mainnet and TGE for Q1 2027, tracking to early February, while the project's FAQ, updated November 14, says no current date is verified. The project warns that any FLOP token or claim site before then is a scam.",
+    sources: [
+      { label: "Flop Labs — official links and status", url: "https://flop.finance/official/" },
+      { label: "TGE Index — Flop Labs, checked November 16", url: "https://tgeindex.com/tge/flop/" },
+    ],
   },
   {
     id: "spicenet-tge",
