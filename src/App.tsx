@@ -9,6 +9,7 @@ import { useTheme } from "@/hooks/useTheme"
 import { useWatchlist } from "@/hooks/useWatchlist"
 import { useI18n } from "@/i18n/context"
 import {
+  compareBySoonest,
   countdownTarget,
   eventDaySpan,
   eventGridDays,
@@ -114,7 +115,7 @@ export default function App() {
             (event.precision === "day" || event.precision === "range") &&
             !isPast(event, now),
         )
-        .sort((a, b) => eventDaySpan(a).start.localeCompare(eventDaySpan(b).start) || a.project.localeCompare(b.project)),
+        .sort((a, b) => compareBySoonest(a, b) || a.project.localeCompare(b.project)),
     [events, now],
   )
 

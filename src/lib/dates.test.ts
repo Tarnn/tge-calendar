@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   addDays,
   buildMonthGrid,
+  compareBySoonest,
   countdownParts,
   countdownTarget,
   diffDays,
@@ -92,6 +93,32 @@ describe("event placement", () => {
   it("puts a market deadline on the deadline day", () => {
     const deadline = { precision: "deadline", date: "2026-12-31", endDate: "2026-12-31" } as const
     expect(eventGridDays(deadline)).toEqual(["2026-12-31"])
+  })
+})
+
+describe("compareBySoonest", () => {
+  const on = (date: string, timeUtc?: string) =>
+    ({ precision: "day", date, endDate: date, ...(timeUtc ? { timeUtc } : {}) }) as const
+
+  it("puts the earlier day first", () => {
+    expect(compareBySoonest(on("2026-11-18"), on("2026-11-20"))).toBeLessThan(0)
+    expect(compareBySoonest(on("2026-11-20", "09:00"), on("2026-11-18", "12:00"))).toBeGreaterThan(0)
+  })
+
+  it("orders two launches on one day by their hour", () => {
+    const noon = on("2026-11-18", "12:00")
+    const morning = on("2026-11-18", "09:00")
+    expect(compareBySoonest(noon, morning)).toBeGreaterThan(0)
+    expect([noon, morning].sort(compareBySoonest)).toEqual([morning, noon])
+  })
+
+  it("counts a date-only event from the start of its day", () => {
+    expect(compareBySoonest(on("2026-11-18"), on("2026-11-18", "12:00"))).toBeLessThan(0)
+  })
+
+  it("leaves events it cannot tell apart in a tie", () => {
+    expect(compareBySoonest(on("2026-11-18"), on("2026-11-18"))).toBe(0)
+    expect(compareBySoonest(on("2026-11-18", "09:00"), on("2026-11-18", "09:00"))).toBe(0)
   })
 })
 

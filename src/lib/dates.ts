@@ -159,6 +159,21 @@ export function countdownTarget(event: Pick<TgeEvent, "date" | "endDate" | "time
   return null
 }
 
+/**
+ * Sort order for "what happens next": by the day an event starts, then by the
+ * moment it starts, so two launches on one day are told apart by their hour.
+ * A date-only event counts from the start of its day, as its countdown does.
+ */
+export function compareBySoonest(
+  a: Pick<TgeEvent, "date" | "endDate" | "timeUtc" | "precision">,
+  b: Pick<TgeEvent, "date" | "endDate" | "timeUtc" | "precision">,
+): number {
+  return (
+    eventDaySpan(a).start.localeCompare(eventDaySpan(b).start) ||
+    (countdownTarget(a)?.getTime() ?? 0) - (countdownTarget(b)?.getTime() ?? 0)
+  )
+}
+
 export interface CountdownParts {
   totalMs: number
   days: number
