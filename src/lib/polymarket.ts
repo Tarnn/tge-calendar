@@ -9,8 +9,13 @@ import { utcDayKey } from "./dates.js"
  * yet: launch-by-date odds, FDV one day after launch, and exchange listings.
  */
 const GAMMA_EVENTS_URL = "https://gamma-api.polymarket.com/events"
-const PAGE_SIZE = 100
-const MAX_PAGES = 4
+/**
+ * Polymarket serves a page of more than 50 events compressed only, and answers
+ * 406 to a client that did not ask for gzip. A browser always asks; the edge
+ * function's fetch does not, so fifty a page is the size every caller gets.
+ */
+const PAGE_SIZE = 50
+const MAX_PAGES = 8
 
 const numberish = z.pipe(
   z.union([z.number(), z.string()]),

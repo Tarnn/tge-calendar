@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   buildSignals,
   classifyTitle,
   deadlineDay,
+  fetchMarketSignals,
   impliedFdv,
   isotonic,
   parseUsdThreshold,
@@ -424,3 +425,32 @@ describe("buildSignals data quality", () => {
   })
 })
 
+
+describe("fetchMarketSignals", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** Polymarket refuses a page of more than 50 events to a client that did not ask for gzip. */
+  it("never asks for more than fifty events a page, and stops at a short page", async () => {
+    const requested: URL[] = []
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input))
+        requested.push(url)
+        const limit = Number(url.searchParams.get("limit"))
+        if (limit > 50) return new Response(JSON.stringify({ error: "gzip_required" }), { status: 406 })
+        const rows = Number(url.searchParams.get("offset")) === 0 ? limit : 3
+        const events = Array.from({ length: rows }, (_, index) => ({
+          title: `Will Project ${url.searchParams.get("offset")}-${index} launch a token by ___?`,
+          slug: `project-${url.searchParams.get("offset")}-${index}`,
+          markets: [],
+        }))
+        return new Response(JSON.stringify(events), { status: 200 })
+      }),
+    )
+
+    await expect(fetchMarketSignals()).resolves.toEqual([])
+    expect(requested.map((url) => url.searchParams.get("limit"))).toEqual(["50", "50"])
+    expect(requested.map((url) => url.searchParams.get("offset"))).toEqual(["0", "50"])
+  })
+})

@@ -117,8 +117,10 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Every token launch")
     const nextUp = screen.getByText("Next up").closest("aside") as HTMLElement
-    expect(within(nextUp).getByText("KieDex")).toBeInTheDocument()
-    expect(within(nextUp).getByRole("timer")).toHaveTextContent("07")
+    // Two launches share November 18: Predict.fun at 09:00 UTC comes before KieDex at 12:00.
+    expect(within(nextUp).getByText("Predict.fun")).toBeInTheDocument()
+    expect(within(nextUp).getByText(/09:00 UTC/)).toBeInTheDocument()
+    expect(within(nextUp).getByRole("timer")).toHaveTextContent("06")
     // The hero stats count the bundled calendar even before any network call resolves.
     expect(screen.getByText("upcoming events")).toBeInTheDocument()
   })
