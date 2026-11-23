@@ -9,7 +9,7 @@ import type { TgeEvent } from "../types.js"
  * To add or correct an event, edit this file and open a pull request.
  * Day precision needs an exact date; anything vaguer is a `window`.
  */
-export const DATASET_VERIFIED_ON = "2026-11-16"
+export const DATASET_VERIFIED_ON = "2026-11-23"
 
 /** Past this many days without a re-check, the page says so next to the calendar. */
 export const DATASET_STALE_AFTER_DAYS = 21
@@ -52,6 +52,10 @@ const MRNASDOG_NOV = {
 const MRNASDOG_DEC = {
   label: "MrNasDog — token unlocks, December 2026",
   url: "https://mrnasdog.com/token-unlocks/december-2026",
+}
+const MRNASDOG_JAN = {
+  label: "MrNasDog — token unlocks, January 2027",
+  url: "https://mrnasdog.com/token-unlocks/january-2027",
 }
 
 const Q4_2026 = { date: "2026-10-01", endDate: "2026-12-31" } as const
@@ -283,21 +287,21 @@ const curated: Curated[] = [
     project: "Xsolla ZK",
     symbol: "XLA",
     type: "tge",
-    status: "expected",
-    precision: "window",
-    date: "2026-11-10",
-    endDate: "2026-11-30",
-    dateLabel: "Coming soon on Kraken — date TBA",
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-17",
+    endDate: "2026-11-17",
+    timeUtc: "15:00",
     chain: "Ethereum",
     categories: ["Gaming", "L2"],
     summary:
       "Gas token of Xsolla ZK, a games-focused Ethereum layer 2 on the ZKsync stack from the payments company Xsolla. The MiCA white paper says the whole 1B supply is unlocked from the TGE.",
-    note: "The white paper gives November 10 as the first day of admission to trading and names Kraken and Bitvavo. Kraken posted \"Coming soon\" on November 16 without a date. The end of the window is a tracker's November target, not an announced deadline.",
-    venues: ["Kraken (coming soon)", "Bitvavo (named in the white paper)"],
+    note: "Kraken opened XLA trading a day after announcing it. The white paper also names Bitvavo. The Xsolla ZK mainnet itself had not launched yet, the project said that day.",
+    venues: ["Kraken", "Bitvavo (named in the white paper)"],
     sources: [
-      { label: "Kraken Listings on X — Xsolla ZK coming soon", url: "https://x.com/krakenlistings/status/2122344039634862280" },
+      { label: "Kraken Listings on X — XLA now live", url: "https://x.com/krakenlistings/status/2122706404637311397" },
       { label: "Xsolla ZK — MiCA white paper", url: "https://xsolla.org/mica-whitepaper.html" },
-      { label: "TGE Index — Xsolla ZK, checked November 16", url: "https://tgeindex.com/tge/xsolla-zk/" },
+      { label: "TGE Index — Xsolla ZK, checked November 23", url: "https://tgeindex.com/tge/xsolla-zk/" },
     ],
   },
   {
@@ -344,21 +348,21 @@ const curated: Curated[] = [
     project: "KieDex",
     symbol: "KDX",
     type: "tge",
-    status: "confirmed",
-    precision: "day",
+    status: "tentative",
+    precision: "window",
     date: "2026-11-18",
-    endDate: "2026-11-18",
-    timeUtc: "12:00",
+    endDate: "2026-12-31",
+    dateLabel: "Missed November 18 — new date TBA",
     chain: "Base",
     categories: ["Perp DEX", "DeFi"],
     summary:
       "Trade-to-earn futures exchange on Base. Private-round buyers unlock 50% at TGE; public rounds unlock 60–70%.",
-    note: "No exchange listing or official contract address has been published — treat any KDX token trading before TGE as counterfeit.",
+    note: "The team itself set November 18, but the day passed with no launch post and its X account has been silent since November 10. No exchange listing or official contract address has been published — treat any KDX token on the market as counterfeit. The window shown is only a placeholder that runs to the end of the year.",
     raisedUsd: 3_500_000,
     sources: [
-      { label: "Bitrue — KieDex (KDX) TGE", url: "https://www.bitrue.com/blog/kiedex-kdx-tge" },
+      { label: "TGE Index — KieDex, checked November 23", url: "https://tgeindex.com/tge/kiedex/" },
       { label: "KieDex on X — TGE officially set for November 18", url: "https://x.com/kiedexapp/status/2115830448261828685" },
-      ICO_ANALYTICS,
+      { label: "Bitrue — KieDex (KDX) TGE", url: "https://www.bitrue.com/blog/kiedex-kdx-tge" },
     ],
   },
   {
@@ -380,6 +384,25 @@ const curated: Curated[] = [
       },
       MRNASDOG_NOV,
       KUCOIN_UNLOCKS,
+    ],
+  },
+  {
+    id: "bitfi-tge",
+    project: "BitFi",
+    symbol: "BFI",
+    type: "tge",
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-20",
+    endDate: "2026-11-20",
+    chain: "Ethereum",
+    categories: ["DeFi", "Yield"],
+    summary:
+      "On-chain asset management for Bitcoin and stablecoin yield. BFI launched with a Kraken listing, and claims opened the same day; 14.5% of supply floats at TGE.",
+    venues: ["Kraken"],
+    sources: [
+      { label: "BitFi on X — BFI listing on Kraken", url: "https://x.com/Bitfi_Org/status/2123802043844612256" },
+      { label: "TGE Index — BitFi, checked November 23", url: "https://tgeindex.com/tge/bitfi/" },
     ],
   },
   {
@@ -412,15 +435,20 @@ const curated: Curated[] = [
     symbol: "DACT",
     type: "tge",
     status: "tentative",
-    precision: "day",
+    precision: "window",
     date: "2026-11-22",
-    endDate: "2026-11-22",
-    timeUtc: "00:00",
+    endDate: "2026-12-31",
+    dateLabel: "November 22 withdrawn — new date TBA",
     chain: "Ethereum",
     categories: ["L1"],
     summary: "Quantum-ready layer 1 from DAC Labs. DACT is reported to be an ERC-20 on Ethereum, separate from the chain's native coin. About 14.5% of supply floats at TGE.",
-    note: "Sources conflict: an earlier guide gave October 22. The November 22 date comes from a vesting repository and was not announced on X.",
+    note: "The project's vesting repository dropped its November 22 date on November 16 and now says the final TGE date is to be announced; an earlier guide had given October 22. The team never announced a date on X. The window shown is only a placeholder that runs to the end of the year.",
     sources: [
+      { label: "DAC — token vesting repository", url: "https://github.com/dacblockchain/dac-token-vesting" },
+      {
+        label: "Cryptolaxy — DACT TGE, date TBA",
+        url: "https://cryptolaxy.com/event/dac-chain-dact-token-generation-event",
+      },
       BITRUE_NOV,
       { label: "Bittime — what DAC Chain and DACT are", url: "https://www.bittime.com/en/blog/apa-itu-dac-chain-dact" },
     ],
@@ -467,24 +495,23 @@ const curated: Curated[] = [
     project: "Extended",
     symbol: "XTEN",
     type: "tge",
-    status: "expected",
-    precision: "window",
-    date: "2026-11-01",
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-30",
     endDate: "2026-11-30",
     chain: "Arc",
     categories: ["Perp DEX", "DeFi"],
     summary:
       "Perpetual futures exchange (formerly X10). 30% of supply goes to points participants, fully unlocked at TGE. The team says XTEN will be the first third-party token to launch on Arc.",
-    note: "The whitepaper's November 2 date was withdrawn that same day. On November 11 the team opened the allocation checker — terms must be accepted by December 31, 23:59 UTC — and said the TGE date will be announced separately, so the launch may fall outside November.",
+    note: "The team set the date on November 20, after withdrawing the whitepaper's November 2. Holders must sign the terms before TGE to be in the first transfer batch; allocations not accepted by December 31, 23:59 UTC go to the ecosystem fund. No hour or exchange has been named.",
     raisedUsd: 19_000_000,
     sources: [
-      { label: "Extended on X — launch date withdrawn", url: "https://x.com/extendedapp/status/2117309226423108056" },
+      { label: "Extended on X — XTEN launches on 30 November", url: "https://x.com/extendedapp/status/2123831601213722961" },
       {
-        label: "The Defiant — XTEN checker opens, TGE date still to be announced",
+        label: "The Defiant — XTEN checker and the December 31 signing deadline",
         url: "https://thedefiant.io/news/tokens/extended-opens-xten-checker-with-dec-31-signing-deadline",
       },
-      BITRUE_NOV,
-      ICO_ANALYTICS,
+      { label: "Extended on X — earlier date withdrawn", url: "https://x.com/extendedapp/status/2117309226423108056" },
     ],
   },
   {
@@ -493,30 +520,29 @@ const curated: Curated[] = [
     symbol: "PREDICT",
     type: "tge",
     status: "confirmed",
-    precision: "day",
-    date: "2026-11-18",
-    endDate: "2026-11-18",
-    timeUtc: "09:00",
+    precision: "window",
+    date: "2026-12-01",
+    endDate: "2026-12-15",
+    dateLabel: "Target: December 1–15",
     chain: "BNB Chain",
     categories: ["Prediction market"],
     summary:
       "Prediction-market platform. 16% of supply unlocks at TGE, with 7% set aside for the Season 1 airdrop.",
-    note: "Rescheduled: the October 30 launch was called off hours before the open. Binance Wallet says the TGE resumes at 09:00 UTC with trading on Binance Alpha, and Season 1 airdrop claims are reported to open at the same time, with a choice between 35% at once or the full amount in monthly instalments over a year. No new time was found for the Binance spot listing postponed in October, and one weekly round-up notes that Binance's updated airdrop announcement dates its first distribution December 18.",
+    note: "Postponed twice. The October 30 launch was called off hours before the open, and on November 17, a day before the rescheduled TGE, the team postponed it and the Season 1 airdrop claim again. It is targeting a launch within two to four weeks of that post and has promised a confirmed date. Claim choices can be changed until TGE. No new time has been named for the Binance spot listing postponed in October.",
     venues: ["Binance Wallet (Pre-TGE Prime Sale)", "Binance Alpha", "Binance (spot listing postponed)", "MEXC (postponed)"],
     sources: [
       {
-        label: "Binance Wallet on X — PREDICT TGE resumes November 18, 09:00 UTC",
+        label: "Predict.fun on X — TGE and airdrop claim postponed, new target in 2–4 weeks",
+        url: "https://x.com/predictdotfun/status/2122570440363434350",
+      },
+      {
+        label: "Cryptolaxy — PREDICT TGE and Season 1 airdrop claim",
+        url: "https://cryptolaxy.com/event/predictfun-predict-tge-season-1-airdrop-claim",
+      },
+      {
+        label: "Binance Wallet on X — the November 18 date, since postponed",
         url: "https://x.com/BinanceWallet/status/2120781504465014809",
       },
-      {
-        label: "Binance Square — Predict.fun relaunch and airdrop claim options",
-        url: "https://www.binance.com/en-IN/square/post/388262110092884",
-      },
-      {
-        label: "JrKripto — crypto this week, November 16–22",
-        url: "https://jrkripto.com/en/news/crypto-this-week-48-events-in-focus",
-      },
-      { label: "CoinGabbar — Predict.fun TGE delayed", url: "https://www.coingabbar.com/en/predict-fun-tge-delayed" },
       {
         label: "Binance — PREDICT listing announcement (since postponed)",
         url: "https://www.binance.com/en/support/announcement/a259777ee4104befa3daba5c1eadc7b5",
@@ -646,13 +672,26 @@ const curated: Curated[] = [
     project: "InfiniFi",
     symbol: "INFI",
     type: "tge",
-    status: "expected",
-    precision: "window",
-    ...Q4_2026,
+    status: "confirmed",
+    precision: "day",
+    date: "2026-11-17",
+    endDate: "2026-11-17",
+    timeUtc: "15:30",
+    chain: "Ethereum",
     categories: ["DeFi", "Lending"],
-    summary: "DeFi lending and borrowing protocol.",
+    summary: "DeFi lending and borrowing protocol. INFI became transferable on Ethereum and Base at 15:30 UTC, a day after the airdrop was distributed in a frozen state.",
+    note: "Launched as scheduled. KuCoin listed INFI as a world premiere at the same minute; TGE Index, which checks official posts, also records Kraken, OKX Boost, Gate, FalconX OTC and an INFI/USDC pool on Aerodrome.",
     raisedUsd: 6_000_000,
-    sources: [ICO_ANALYTICS],
+    venues: ["KuCoin", "Kraken", "OKX Boost", "Gate", "Aerodrome"],
+    sources: [
+      { label: "infiniFi on X — TGE on November 17 at 15:30 UTC", url: "https://x.com/infiniFi/status/2122355391530987770" },
+      {
+        label: "KuCoin — listing announcement",
+        url: "https://www.kucoin.com/announcement/en-world-premiere-infinifi-infi-listed-on-kucoin",
+      },
+      { label: "TGE Index — infiniFi, checked November 18", url: "https://tgeindex.com/tge/infinifi/" },
+      ICO_ANALYTICS,
+    ],
   },
   {
     id: "teneo-tge",
@@ -807,6 +846,23 @@ const curated: Curated[] = [
     summary: "Public mainnet release of the identity-aware lending protocol.",
     note: "Moved from October 19, 2026 for another round of security testing. The team describes January 5 as a target and has promised monthly updates.",
     sources: [SOUL_DELAY, ICO_ANALYTICS],
+  },
+  {
+    id: "ondo-unlock-jan",
+    project: "Ondo Finance",
+    symbol: "ONDO",
+    type: "unlock",
+    status: "expected",
+    precision: "day",
+    date: "2027-01-18",
+    endDate: "2027-01-18",
+    categories: ["RWA", "Unlock"],
+    summary:
+      "Yearly unlock of about 1.71B ONDO, 17% of total supply and roughly a third more than circulates today. Trackers value it at $480–510M at late-November prices.",
+    sources: [
+      MRNASDOG_JAN,
+      { label: "Tokenomics.com — Ondo unlock schedule", url: "https://app.tokenomics.com/tokenomics/ondo/unlocks" },
+    ],
   },
   {
     id: "flop-labs-airdrop",

@@ -117,9 +117,9 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Every token launch")
     const nextUp = screen.getByText("Next up").closest("aside") as HTMLElement
-    // Two launches share November 18: Predict.fun at 09:00 UTC comes before KieDex at 12:00.
-    expect(within(nextUp).getByText("Predict.fun")).toBeInTheDocument()
-    expect(within(nextUp).getByText(/09:00 UTC/)).toBeInTheDocument()
+    // Two launches share November 17: Xsolla ZK at 15:00 UTC comes before infiniFi at 15:30.
+    expect(within(nextUp).getByText("Xsolla ZK")).toBeInTheDocument()
+    expect(within(nextUp).getByText(/15:00 UTC/)).toBeInTheDocument()
     expect(within(nextUp).getByRole("timer")).toHaveTextContent("06")
     // The hero stats count the bundled calendar even before any network call resolves.
     expect(screen.getByText("upcoming events")).toBeInTheDocument()
@@ -132,24 +132,24 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: /november 2026/i })).toBeInTheDocument()
     const grid = screen.getByRole("grid")
-    await user.click(within(grid).getByRole("button", { name: "KDX" }))
+    await user.click(within(grid).getByRole("button", { name: "XLA" }))
 
     const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByRole("heading", { name: /KieDex/ })).toBeInTheDocument()
-    expect(within(dialog).getByText(/12:00 UTC/)).toBeInTheDocument()
-    expect(within(dialog).getByRole("link", { name: /Bitrue/ })).toHaveAttribute(
+    expect(within(dialog).getByRole("heading", { name: /Xsolla ZK/ })).toBeInTheDocument()
+    expect(within(dialog).getByText(/15:00 UTC/)).toBeInTheDocument()
+    expect(within(dialog).getByRole("link", { name: /Kraken/ })).toHaveAttribute(
       "href",
-      "https://www.bitrue.com/blog/kiedex-kdx-tge",
+      "https://x.com/krakenlistings/status/2122706404637311397",
     )
-    expect(window.location.hash).toBe("#event=kiedex-tge")
+    expect(window.location.hash).toBe("#event=xsolla-zk-tge")
   })
 
   it("lists undated launches for the month instead of inventing a day", () => {
     stubFetch()
     renderApp()
     const rail = screen.getByRole("heading", { name: /date to be announced/i }).closest("section") as HTMLElement
-    expect(within(rail).getByText("Xsolla ZK")).toBeInTheDocument()
-    expect(within(rail).getByText("Coming soon on Kraken — date TBA")).toBeInTheDocument()
+    expect(within(rail).getByText("KieDex")).toBeInTheDocument()
+    expect(within(rail).getByText("Missed November 18 — new date TBA")).toBeInTheDocument()
     expect(within(rail).getByText("Variational")).toBeInTheDocument()
   })
 
@@ -174,7 +174,7 @@ describe("App", () => {
     const user = userEvent.setup()
     renderApp()
 
-    expect(within(screen.getByRole("grid")).getByRole("button", { name: "KDX" })).toBeInTheDocument()
+    expect(within(screen.getByRole("grid")).getByRole("button", { name: "XLA" })).toBeInTheDocument()
     await user.click(screen.getByRole("tab", { name: "Radar" }))
     await waitFor(() => expect(screen.getAllByText(/Could not reach Polymarket/).length).toBeGreaterThan(0), LAZY)
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument()
@@ -188,11 +188,11 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Unlock" }))
     const grid = screen.getByRole("grid")
     expect(within(grid).getByRole("button", { name: "MON" })).toBeInTheDocument()
-    expect(within(grid).queryByRole("button", { name: "KDX" })).not.toBeInTheDocument()
-    expect(screen.getByText("8 events")).toBeInTheDocument()
+    expect(within(grid).queryByRole("button", { name: "XLA" })).not.toBeInTheDocument()
+    expect(screen.getByText("9 events")).toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Clear all" }))
-    expect(within(grid).getByRole("button", { name: "KDX" })).toBeInTheDocument()
+    expect(within(grid).getByRole("button", { name: "XLA" })).toBeInTheDocument()
   })
 
   it("narrows the calendar with the quick filter", async () => {
@@ -203,7 +203,7 @@ describe("App", () => {
     await user.type(screen.getByRole("searchbox", { name: /filter by name/i }), "monad")
     const grid = screen.getByRole("grid")
     expect(within(grid).getByRole("button", { name: "MON" })).toBeInTheDocument()
-    expect(within(grid).queryByRole("button", { name: "KDX" })).not.toBeInTheDocument()
+    expect(within(grid).queryByRole("button", { name: "XLA" })).not.toBeInTheDocument()
     expect(screen.getByText("1 events")).toBeInTheDocument()
   })
 
@@ -313,7 +313,7 @@ describe("App", () => {
 
     vi.setSystemTime(new Date("2027-01-15T12:00:00Z"))
     renderApp()
-    expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 60 days ago, on Nov 16, 2026\./)
+    expect(screen.getByRole("note")).toHaveTextContent(/The curated dates were last checked 53 days ago, on Nov 23, 2026\./)
   })
 
   it("offers a way back to the top once the page has been scrolled", async () => {
